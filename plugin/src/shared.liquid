@@ -1,0 +1,25 @@
+{% template mountain %}
+{% assign state = status | default: 'unknown' %}
+<svg width="{{ image_width }}" height="{{ image_height }}" viewBox="0 0 736 300" role="img" aria-label="Illustrated mountain visibility estimate: {{ state | escape }}. Cloud positions are symbolic.">
+  {% unless state == 'unknown' %}
+  <image href="{{ image_origin | escape }}{{ image_path | default: '/assets/rainier-seattle.png' | escape }}" x="0" y="0" width="736" height="300" preserveAspectRatio="xMidYMid meet" />
+  {% endunless %}
+  {% case state %}
+  {% when 'mostly_out' %}{% assign cloud_y = 175 %}
+  {% when 'halfway_out' %}{% assign cloud_y = 90 %}
+  {% when 'kinda_out' %}{% assign cloud_y = 20 %}
+  {% when 'not_out' %}{% assign cloud_y = -60 %}
+  {% endcase %}
+  {% if state == 'mostly_out' or state == 'halfway_out' or state == 'kinda_out' or state == 'not_out' %}
+  <!-- Naturalistic ink cloud texture with an opaque white body masks the scene. -->
+  <g transform="translate(0 {{ cloud_y }})">
+    <rect x="0" y="180" width="736" height="320" fill="#fff"/>
+    <image href="{{ image_origin | escape }}/assets/cloud-bank.png" x="0" y="0" width="736" height="250" preserveAspectRatio="none" />
+  </g>
+  {% elsif state == 'unknown' %}
+  <!-- An unfilled dashed outline conveys missing data, without implying weather. -->
+  <path d="M24 248 Q100 238 156 202 L177 187 195 201 Q247 173 287 129 Q319 91 357 86 Q393 77 426 96 Q463 118 483 148 Q540 207 612 222 L712 248" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="12 10" stroke-linecap="round"/>
+  {% endif %}
+</svg>
+<span class="value {{ value_size }}">{{ verdict | default: 'UNKNOWN' | escape }}</span>
+{% endtemplate %}

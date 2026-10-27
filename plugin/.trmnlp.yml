@@ -1,0 +1,11 @@
+---
+watch:
+  - .trmnlp.yml
+  - src
+custom_fields:
+  service_url: http://127.0.0.1:8080
+  mountain: rainier
+  rainier_viewpoint: seattle
+  hood_viewpoint: portland
+variables:
+  trmnl: {}

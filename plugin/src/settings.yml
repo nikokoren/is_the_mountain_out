@@ -1,0 +1,52 @@
+---
+name: Is the Mountain Out?
+framework_version: '3.4.0'
+strategy: polling
+refresh_interval: 15
+no_screen_padding: 'no'
+dark_mode: 'no'
+polling_verb: get
+polling_url: "{{ service_url }}/api/visibility?mountain={{ mountain | default: 'rainier' }}&viewpoint={% if mountain == 'hood' %}{{ hood_viewpoint | default: 'portland' }}{% else %}{{ rainier_viewpoint | default: 'seattle' }}{% endif %}"
+polling_headers: ''
+polling_body: ''
+custom_fields:
+  - keyname: author_bio
+    name: About this recipe
+    field_type: author_bio
+    description: An uncalibrated weather estimate for Mount Rainier, not a confirmed observation.
+    github_url: https://github.com/nikokoren/is_the_mountain_out
+  - keyname: service_url
+    name: Visibility service URL
+    field_type: string
+    description: Your deployed HTTPS service origin, without a trailing slash.
+    placeholder: https://mountain.example.com
+  - keyname: mountain
+    name: Mountain to view
+    field_type: select
+    default: rainier
+    options:
+      - Mount Rainier / Tahoma: rainier
+      - Mount Hood / Wy’east: hood
+    conditional_validation:
+      - when: rainier
+        required: [rainier_viewpoint]
+        hidden: [hood_viewpoint]
+      - when: hood
+        required: [hood_viewpoint]
+        hidden: [rainier_viewpoint]
+  - keyname: rainier_viewpoint
+    name: Mount Rainier viewpoint
+    optional: true
+    field_type: select
+    default: seattle
+    options:
+      - Seattle — Kerry Park: seattle
+      - Tacoma — Ruston Way: tacoma
+      - Paradise: paradise
+  - keyname: hood_viewpoint
+    name: Mount Hood viewpoint
+    field_type: select
+    optional: true
+    default: portland
+    options:
+      - Portland — Pittock Mansion: portland
