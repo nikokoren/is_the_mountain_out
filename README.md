@@ -281,3 +281,8 @@ content bounds and bottom-right anchoring.
 Create a TRMNL import ZIP with `.venv/bin/python tools/package_plugin.py`.
 Use `--service-url https://YOUR-HOST --enable-feedback` to prefill an installation;
 the standard source settings still leave the QR opt-in disabled by default.
+
+The full-screen QR uses the native `w--32` width token (128 layout pixels,
+including its quiet zone), approximately one inch on the original 7.5-inch TRMNL.
+It no longer grows as a fraction of screen width. Physical size on other devices
+follows their native pixel ratio; the Submit report label remains below the square.
