@@ -1,0 +1,27 @@
+{
+  "name": "is-the-mountain-out",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers and D1 hosting for the TRMNL mountain recipe",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir cloudflare/dist",
+    "deploy": "wrangler deploy",
+    "test": "npm run build && cd cloudflare && node --test test/*.test.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
+  },
+  "devDependencies": {
+    "miniflare": "5.20261023.1-beta",
+    "wrangler": "4.154.0"
+  },
+  "private": true,
+  "cloudflare": {
+    "bindings": {
+      "DB": {
+        "description": "Stores weather cache, anonymous feedback, and expiring report links. Created automatically; keep it when redeploying."
+      }
+    }
+  }
+}

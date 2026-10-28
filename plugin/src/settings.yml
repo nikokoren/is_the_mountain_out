@@ -6,7 +6,7 @@ refresh_interval: 15
 no_screen_padding: 'no'
 dark_mode: 'no'
 polling_verb: get
-polling_url: "{{ service_url }}/api/visibility?mountain={{ mountain | default: 'rainier' }}&viewpoint={% if mountain == 'hood' %}{{ hood_viewpoint | default: 'portland' }}{% else %}{{ rainier_viewpoint | default: 'seattle' }}{% endif %}"
+polling_url: "{{ service_url }}/api/visibility?mountain={{ mountain | default: 'rainier' }}&viewpoint={% if mountain == 'hood' %}{{ hood_viewpoint | default: 'portland' }}{% else %}{{ rainier_viewpoint | default: 'seattle' }}{% endif %}&feedback={{ show_feedback_qr | default: 'false' }}"
 polling_headers: ''
 polling_body: ''
 custom_fields:
@@ -50,3 +50,8 @@ custom_fields:
     default: portland
     options:
       - Portland — Pittock Mansion: portland
+  - keyname: show_feedback_qr
+    name: Show feedback QR code
+    field_type: boolean
+    default: false
+    description: Let viewers report current visibility. Requires feedback-enabled hosting with a public URL.

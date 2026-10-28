@@ -14,13 +14,29 @@ uncalibrated Seattle estimate, not a confirmed view. Terrain, cloud heights,
 darkness and webcam verification are not modelled. Paradise retains the local model.
 The preset selects both weather geometry and viewpoint-specific generated artwork.
 
-## Run
+## Put it online
 
-Python 3.11+ with system timezone data is sufficient. No API key or runtime packages.
+Use the [Cloudflare deployment guide](docs/cloudflare.md). It replaces the manual
+server-hosting instructions: Cloudflare handles HTTPS, the application and D1
+storage. Your existing Cloudflare account is enough to start.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/nikokoren/is_the_mountain_out)
+
+The hosted version includes the optional feedback QR and the agreed 20-minute
+community-vote policy. Local deployment tests pass; deployment into your account,
+live weather access there and physical TRMNL validation remain to be checked.
+
+## Local Python development (optional)
+
+
+Python 3.11+ with system timezone data is required. No weather API key is needed.
+Install the runtime dependencies (a local QR encoder) before starting:
 
 ```sh
 cd /workspace/is_the_mountain_out
-python -m mountain.server
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m mountain.server
 ```
 
 The service listens on loopback port 8080. `/health` checks the server process;
@@ -37,11 +53,9 @@ Other routes receive HTTP 404. See [model and data contract](docs/model.md).
 
 ## Install on TRMNL
 
-1. Deploy the Python service on an always-on host with outbound HTTPS access to
-   `api.open-meteo.com`. Run `python -m mountain.server --host 0.0.0.0 --port 8080`
-   behind your normal TLS reverse proxy and process supervisor. The stdlib HTTP
-   server is a small origin service, not an Internet-facing production gateway;
-   configure request limits/rate limits at the proxy. No secrets are required.
+1. Follow [Deploy to Cloudflare](docs/cloudflare.md). After deployment, open the
+   landing page and copy its HTTPS service URL. The Python server commands above
+   are for local development, not the recommended public hosting setup.
 2. Create a Private Plugin using **Polling**, GET, and a 15-minute refresh.
    Apply the settings in [plugin/src/settings.yml](plugin/src/settings.yml), pinned
    to Framework **3.4.0**. Fill in your service's public HTTPS origin (no trailing
@@ -86,9 +100,9 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 29 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 38 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
-missing data, and all 96 mountain/viewpoint/state/layout combinations. The preview harness adapts
+missing data, and all 192 mountain/viewpoint/state/layout/QR combinations. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
 Framework 3.4.0 CSS and fonts. It does **not** substitute for the hosted renderer.
 
@@ -96,7 +110,7 @@ For the official preview tool, install [trmnlp](https://github.com/usetrmnl/trmn
 start this service, then run `trmnlp serve` from `plugin/`. Its local custom fields
 are supplied in `.trmnlp.yml`. This optional Ruby tool is not required by the service.
 
-## Maintenance
+## Python development notes
 
 Keep the origin running under a supervisor, terminate TLS at the gateway, and
 monitor `/api/visibility` as well as `/health`: process health does not prove
@@ -166,3 +180,71 @@ and 24 full-resolution full-layout fixtures in `docs/previews/`. The settings us
 TRMNL `conditional_validation` with `when`, `required`, and `hidden`, following the
 [published form guide and examples](https://github.com/blueset/trmnl-recipes/blob/master/refs/template_guide.md).
 Hosted form behavior and physical device rendering still require TRMNL verification.
+
+## Python development feedback collector
+
+For hosted deployment, follow the [Cloudflare guide](docs/cloudflare.md). The
+following is only for running the alternative Python collector yourself. Its
+report history does not override the weather model. Enable **Show feedback QR code**
+in the recipe settings (off by default); this Python collector additionally needs
+its public origin and a persistent private data directory:
+
+```sh
+.venv/bin/python -m mountain.server --host 0.0.0.0 --port 8080 \
+  --public-url https://YOUR-HOST --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
+```
+
+Use the same HTTPS origin for `service_url`. Only loopback development permits
+HTTP. Avoid mounting the data directory under a publicly served path; protect it
+and its backups. The new GET `feedback=true` option returns `feedback_qr_path`
+only when collection is configured. If it is not configured, weather still works,
+`feedback_ready` is false, and no broken QR appears. QR encoding is entirely local.
+The four-minute-to-several-hour age of a device screen cannot be inferred from a
+scan, so each QR expires after two hours and asks for an observation **now**.
+
+People can report Out / Partly out / Not out / Can’t tell and must confirm they
+are at or near the named viewpoint. No name, photo, precise GPS, or IP address is
+stored by this application. Gateway/access logs need their own privacy settings.
+A random first-party cookie, its database HMAC, and ten-minute windows limit
+repeat reports from the same browser/viewpoint. This is not identity verification;
+clearing cookies bypasses that limit. No invite-only trust tier is implemented.
+
+After submitting, contributors see agreement/disagreement with the estimate behind
+the code and counts of reports at that viewpoint from the past 20 minutes. They
+see these **after** answering to avoid suggesting an answer. Contradictory reports
+are shown separately; no majority is described as verified truth. The immutable
+prediction snapshot, including model and forecast times, stays attached to the
+report. Client-submitted prediction fields are ignored. Reports never silently
+alter the weather model or on-device verdict.
+
+Private operator tools (JSON Lines, no public export endpoint):
+
+```sh
+.venv/bin/python -m mountain.feedback review --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
+.venv/bin/python -m mountain.feedback export --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
+.venv/bin/python -m mountain.feedback prune --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
+```
+
+`review` lists disagreements received in the past 24 hours; it is an inspection
+queue, not an automatic verdict of model failure. The running server cleans up
+expired QR contexts and reports older than 90 days at startup and hourly. If the
+service is stopped, run `prune` before exporting/reusing old storage. Keep backups
+on the same retention schedule. SQLite is suitable for a small single-instance
+pilot; multiple hosts need shared storage or a separate collection service.
+Apply gateway rate limits to polling and submission routes before public deployment.
+
+For the initial small trusted group, review disagreements daily and act on clear
+failure modes. Compare observation receipt time with the display’s check and
+forecast time: conditions may have changed since that estimate. Keep uncertain
+answers out of agreement counts, avoid claiming precision from a handful of votes,
+and retain conflicting reports. Fix obvious systematic bugs immediately, then
+compare threshold changes on later, separate observations. A future trusted-observer
+mode could allow explicitly identified/invited contributors or a moderator to issue
+a short-lived observed verdict; public QR submissions alone must not grant that trust.
+
+`.venv/bin/python tools/check_feedback.py` validates a mobile submission, saved
+report and disagreement review with temporary data and fixture weather. Previews:
+[QR display](docs/feedback-qr-preview.png), [mobile form](docs/feedback-form-preview.png),
+and [receipt with recent reports](docs/feedback-receipt-preview.png).
+The QR in the display preview is an example-domain fixture, not a live collection link.
+Public hosting, physical QR scanability, and TRMNL rendering remain deployment checks.

@@ -1,4 +1,8 @@
 {% template mountain %}
+{% if feedback_qr_path %}
+  {% if image_height == 130 or image_height == 120 %}{% assign image_height = 64 %}{% endif %}
+  {% if image_width == 336 %}{% assign value_size = 'value--xsmall' %}{% endif %}
+{% endif %}
 {% assign state = status | default: 'unknown' %}
 <svg width="{{ image_width }}" height="{{ image_height }}" viewBox="0 0 736 300" role="img" aria-label="Illustrated mountain visibility estimate: {{ state | escape }}. Cloud positions are symbolic.">
   {% unless state == 'unknown' %}
@@ -21,5 +25,10 @@
   <path d="M24 248 Q100 238 156 202 L177 187 195 201 Q247 173 287 129 Q319 91 357 86 Q393 77 426 96 Q463 118 483 148 Q540 207 612 222 L712 248" fill="none" stroke="#000" stroke-width="4" stroke-dasharray="12 10" stroke-linecap="round"/>
   {% endif %}
 </svg>
+{% if feedback_qr_path %}<div class="flex flex--center-y gap--medium">{% endif %}
 <span class="value {{ value_size }}">{{ verdict | default: 'UNKNOWN' | escape }}</span>
+{% if feedback_qr_path %}
+  <img class="image image--contain" src="{{ image_origin | escape }}{{ feedback_qr_path | escape }}" width="112" height="112" alt="Scan to report whether the mountain is visible">
+</div>
+{% endif %}
 {% endtemplate %}

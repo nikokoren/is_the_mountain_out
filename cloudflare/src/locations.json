@@ -1,0 +1,52 @@
+{
+  "viewpoints": {
+    "seattle": {
+      "id": "seattle",
+      "name": "Seattle \u2014 Kerry Park",
+      "latitude": 47.6295,
+      "longitude": -122.3599,
+      "image_path": "/assets/rainier-seattle.png",
+      "mountain": "rainier"
+    },
+    "paradise": {
+      "id": "paradise",
+      "name": "Paradise",
+      "latitude": 46.786,
+      "longitude": -121.735,
+      "image_path": "/assets/rainier.png",
+      "mountain": "rainier"
+    },
+    "tacoma": {
+      "id": "tacoma",
+      "name": "Tacoma \u2014 Jack Hyde Park / Ruston Way",
+      "latitude": 47.2809,
+      "longitude": -122.4608,
+      "image_path": "/assets/rainier-tacoma.png",
+      "mountain": "rainier"
+    },
+    "portland": {
+      "id": "portland",
+      "name": "Portland \u2014 Pittock Mansion",
+      "latitude": 45.5252,
+      "longitude": -122.7163,
+      "image_path": "/assets/hood-portland.png",
+      "mountain": "hood"
+    }
+  },
+  "mountains": {
+    "rainier": {
+      "name": "Mount Rainier / Tahoma",
+      "summit": [
+        46.8523,
+        -121.7603
+      ]
+    },
+    "hood": {
+      "name": "Mount Hood / Wy\u2019east",
+      "summit": [
+        45.3736,
+        -121.6959
+      ]
+    }
+  }
+}
