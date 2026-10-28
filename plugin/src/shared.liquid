@@ -7,10 +7,16 @@
     {% assign qr_url = image_origin | append: feedback_page %}
   {% endif %}
 {% endif %}
-<div class="flex flex--col w--full h--full gap--small relative">
-  <div class="grow w--full h--min-0">
+<div class="flex flex--col w--full h--full gap--none relative">
+  <div class="w--full h--[67cqh] h--min-0 no-shrink" data-mountain-region>
 {% assign state = status | default: 'unknown' %}
-<svg class="w--full h--full" viewBox="0 0 736 300" role="img" aria-label="Illustrated mountain visibility estimate: {{ state | escape }}. Cloud positions are symbolic.">
+{% comment %}Frame out the source artwork's white bottom margin, keeping its visible base anchored.{% endcomment %}
+{% assign scene_height = 245 %}
+{% if image_path == '/assets/rainier.png' %}{% assign scene_height = 273 %}
+{% elsif image_path == '/assets/rainier-tacoma.png' %}{% assign scene_height = 244 %}
+{% elsif image_path == '/assets/hood-portland.png' %}{% assign scene_height = 243 %}{% endif %}
+{% if state == 'unknown' %}{% assign scene_height = 252 %}{% endif %}
+<svg class="w--full h--full" viewBox="0 0 736 {{ scene_height }}" preserveAspectRatio="xMidYMax meet" role="img" aria-label="Illustrated mountain visibility estimate: {{ state | escape }}. Cloud positions are symbolic.">
   {% unless state == 'unknown' %}
   <image href="{{ image_origin | escape }}{{ image_path | default: '/assets/rainier-seattle.png' | escape }}" x="0" y="0" width="736" height="300" preserveAspectRatio="xMidYMid meet" />
   {% endunless %}
@@ -32,17 +38,10 @@
   {% endif %}
 </svg>
   </div>
-  <div class="flex flex--row flex--center-y w--full no-shrink gap--small">
-    <div class="flex flex--center-x flex--center-y grow w--min-0">
+  <div class="flex flex--center-x flex--center-y w--full grow h--min-0{% if qr_url != '' %} px--32 lg:px--24{% endif %}" data-verdict-region>
+    <div class="flex flex--center-x flex--center-y w--full w--min-0">
       <span class="value value--large lg:value--xxlarge no-shrink" data-fit-value="true">{{ verdict | default: 'UNKNOWN' | escape }}</span>
     </div>
-    {% if qr_url != '' %}
-    <!-- Reserve the same native, scalable footprint as the anchored QR + label. -->
-    <div class="no-shrink w--32 lg:w--24" aria-hidden="true">
-      <div class="aspect--1/1 w--full"></div>
-      <span class="label label--small block">&nbsp;</span>
-    </div>
-    {% endif %}
   </div>
   {% if qr_url != '' %}
   <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>

@@ -50,6 +50,15 @@ def main():
                                       font:n.classList.contains('value')?parseFloat(getComputedStyle(n).fontSize):null};});
                                 }""")
                                 view = page.locator('.view').bounding_box()
+                                content = page.locator('.layout > div').bounding_box()
+                                mountain = page.locator('[data-mountain-region]').bounding_box()
+                                verdict = page.locator('[data-verdict-region]').bounding_box()
+                                text = page.locator('.value').bounding_box()
+                                assert abs(mountain['height'] / content['height'] - .67) < .005, case
+                                assert abs(verdict['y'] - mountain['y'] - mountain['height']) < 1, case
+                                assert abs(text['x'] + text['width']/2 - content['x'] - content['width']/2) < 1, case
+                                assert abs(text['y'] + text['height']/2 - verdict['y'] - verdict['height']/2) < 1, case
+                                assert page.locator('[data-mountain-region] > svg').get_attribute('preserveAspectRatio') == 'xMidYMax meet', case
                                 for item in metrics:
                                     assert item['x'] >= -1 and item['y'] >= -1 and item['x']+item['w'] <= view['width']+1 and item['y']+item['h'] <= view['height']+1, (case,item,view)
                                     if item['font'] is not None: assert item['font'] >= 12, (case,item)
