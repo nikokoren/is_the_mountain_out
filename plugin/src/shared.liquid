@@ -38,14 +38,14 @@
     </div>
     {% if qr_url != '' %}
     <!-- Reserve the same native, scalable footprint as the anchored QR + label. -->
-    <div class="no-shrink w--32" aria-hidden="true">
+    <div class="no-shrink w--32 lg:w--24" aria-hidden="true">
       <div class="aspect--1/1 w--full"></div>
       <span class="label label--small block">&nbsp;</span>
     </div>
     {% endif %}
   </div>
   {% if qr_url != '' %}
-  <div class="absolute bottom--0 right--0 w--32 bg--white" data-feedback-qr>
+  <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
     <div class="w--full p--3" aria-label="Scan to report whether the mountain is visible">
       {{ qr_url | qr_code: 1, 'l' | replace: 'class="qr-code"', 'class="qr-code w--full h--auto block"' }}
     </div>

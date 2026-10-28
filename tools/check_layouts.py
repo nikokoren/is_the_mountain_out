@@ -59,6 +59,11 @@ def main():
                                     decoded = zxingcpp.read_barcode(Image.open(io.BytesIO(qr.screenshot())))
                                     assert decoded and decoded.text == URL, (case, 'QR did not decode')
                                     anchor=page.locator('[data-feedback-qr]').bounding_box()
+                                    # Approximate one-inch square including the quiet zone:
+                                    # OG ~125 ppi; X ~176 ppi, with native 1.8x scaling.
+                                    if device is None or device == 'v2':
+                                        expected_width = 128 if device is None else 96 * 1.8
+                                        assert abs(anchor['width'] - expected_width) <= 1, (case, anchor)
                                     content=page.locator('.layout > div').bounding_box()
                                     assert abs(anchor['x']+anchor['width']-content['x']-content['width'])<=1, case
                                     assert abs(anchor['y']+anchor['height']-content['y']-content['height'])<=1, case

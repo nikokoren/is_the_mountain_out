@@ -282,7 +282,10 @@ Create a TRMNL import ZIP with `.venv/bin/python tools/package_plugin.py`.
 Use `--service-url https://YOUR-HOST --enable-feedback` to prefill an installation;
 the standard source settings still leave the QR opt-in disabled by default.
 
-The full-screen QR uses the native `w--32` width token (128 layout pixels,
-including its quiet zone), approximately one inch on the original 7.5-inch TRMNL.
-It no longer grows as a fraction of screen width. Physical size on other devices
-follows their native pixel ratio; the Submit report label remains below the square.
+The full-screen QR uses native `w--32 lg:w--24` sizing: 128 layout pixels on
+TRMNL OG and 96 on TRMNL X. After the X's native 1.8× pixel ratio, that is about
+173 physical pixels on X versus 128 on OG, approximately one inch on each panel
+(including the quiet zone). The square keeps this size in either orientation;
+the Submit report label sits below it. This physical-size approximation targets
+OG and X; other displays use their native size-class fallback without a physical
+size guarantee.
