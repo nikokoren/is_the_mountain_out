@@ -259,9 +259,10 @@ pixel ratios, portrait/landscape orientation and mashup dimensions.
 
 The optional QR appears **only on Full**, anchored with native `absolute bottom--0
 right--0` utilities inside the framework content area. A native small label below
-it reads **Submit report**. The mountain occupies the upper 67% of the content area,
-with its SVG anchored to the bottom of that region. The verdict is centered
-horizontally and vertically in the remaining 33%. Equal native padding on both
+it reads **Submit report**. The illustration occupies the upper 52% of the content area,
+with its SVG anchored to the bottom of that region. The centered verdict follows
+immediately with a small native gap, rather than sitting in a separate bottom
+third. The fully clouded state also trims the blank tail of the cloud artwork. Equal native padding on both
 sides of the verdict accommodates the independently anchored QR without moving
 the text off center. Half Horizontal, Half Vertical and Quadrant never render the QR or caption.
 TRMNL's native `qr_code` Liquid filter draws it inline, avoiding an extra SVG image

@@ -28,9 +28,9 @@ def main():
                 for layout in SIZES:
                     for feedback in (False, True):
                         # All artwork/states on the original screen; longest verdict and
-                        # unknown on every other device/orientation/view/QR combination.
+                        # unknown and fully clouded on every other device/orientation/view/QR combination.
                         images = IMAGES if device is None and not portrait else IMAGES[:1]
-                        states = STATES if device is None and not portrait else ['mountain_out', 'unknown']
+                        states = STATES if device is None and not portrait else ['mountain_out', 'unknown', 'not_out']
                         for image_path in images:
                             for state in states:
                                 case = (device, portrait, layout, feedback, image_path, state)
@@ -54,8 +54,10 @@ def main():
                                 mountain = page.locator('[data-mountain-region]').bounding_box()
                                 verdict = page.locator('[data-verdict-region]').bounding_box()
                                 text = page.locator('.value').bounding_box()
-                                assert abs(mountain['height'] / content['height'] - .67) < .005, case
-                                assert abs(verdict['y'] - mountain['y'] - mountain['height']) < 1, case
+                                assert abs(mountain['height'] / content['height'] - .52) < .005, case
+                                gap = verdict['y'] - mountain['y'] - mountain['height']
+                                assert 0 < gap <= content['height'] * .05, (case, gap)
+                                assert abs(verdict['height'] - text['height']) < 1, case
                                 assert abs(text['x'] + text['width']/2 - content['x'] - content['width']/2) < 1, case
                                 assert abs(text['y'] + text['height']/2 - verdict['y'] - verdict['height']/2) < 1, case
                                 assert page.locator('[data-mountain-region] > svg').get_attribute('preserveAspectRatio') == 'xMidYMax meet', case
@@ -79,9 +81,9 @@ def main():
                                     assert page.locator('[data-feedback-qr] .label').inner_text()=='Submit report', case
                                     scans += 1
                                 count += 1
-        for feedback, filename in [(False,'clear-fixture.png'),(True,'feedback-qr-preview.png')]:
+        for feedback, filename in [(False,'clear-fixture.png'),(True,'feedback-qr-preview.png'),(True,'not-out-qr-preview.png')]:
             page.set_viewport_size({'width':800,'height':480})
-            page.set_content(render(feedback_url=URL if feedback else None, feedback_qr_path='/q/0123456789abcdef01234567' if feedback else None))
+            page.set_content(render(state='not_out' if filename.startswith('not-out') else 'mountain_out', feedback_url=URL if feedback else None, feedback_qr_path='/q/0123456789abcdef01234567' if feedback else None))
             settle(page)
             page.locator('.screen').screenshot(path=str(ROOT/'docs'/filename))
         browser.close()
