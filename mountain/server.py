@@ -84,12 +84,13 @@ def handler(service, feedback_store=None, public_url=None):
                     self.send_json(400, {'error': 'Choose mountain=rainier with viewpoint=seattle/tacoma/paradise, or mountain=hood with viewpoint=portland. Coordinate overrides are unsupported.'})
                     return
                 result = service.result(location)
-                if query.get('feedback', ['false'])[0].lower() == 'true':
+                if query.get('feedback', ['false'])[0].strip().lower() in ('true', '1', 'yes', 'on'):
                     result['feedback_ready'] = bool(feedback_store and public_url)
                     if result['feedback_ready']:
                         try:
                             token = feedback_store.issue(result)
                             result['feedback_qr_path'] = '/q/' + token
+                            result['feedback_url'] = public_url + '/f/' + token
                         except sqlite3.Error:
                             result['feedback_ready'] = False
                 self.send_json(200, result)

@@ -19,18 +19,8 @@ def main():
                                     args=['--no-sandbox'])
         page = browser.new_page(viewport={'width': 800, 'height': 480})
 
-        def asset(route):
-            path = urlsplit(route.request.url).path
-            if path == '/css/3.4.0/plugins.css':
-                route.fulfill(path=str(ROOT / '.venv/framework/plugins.css'), content_type='text/css')
-            elif path.startswith('/fonts/'):
-                route.fulfill(path=str(ROOT / '.venv/framework' / path.lstrip('/')))
-            elif path in ('/assets/rainier.png', '/assets/rainier-seattle.png', '/assets/rainier-tacoma.png', '/assets/hood-portland.png', '/assets/cloud-bank.png'):
-                route.fulfill(path=str(ROOT / path.lstrip('/')), content_type='image/png')
-            else:
-                route.abort()
-
-        page.route('**/*', asset)
+        from tools.browser_support import install_assets, settle
+        install_assets(page)
         for viewpoint, title, image in [('seattle', 'Seattle — Kerry Park', 'rainier-seattle.png'),
                                         ('paradise', 'Paradise', 'rainier.png'),
                                         ('tacoma', 'Tacoma — Ruston Way', 'rainier-tacoma.png'),
@@ -39,7 +29,7 @@ def main():
             for state in STATES:
                 page.set_viewport_size({'width': 800, 'height': 480})
                 page.set_content(render(state, 'full', image_path='/assets/' + image))
-                page.evaluate('document.fonts.ready')
+                settle(page)
                 png = page.locator('.screen').screenshot(path=str(OUTPUT / f'{viewpoint}-{state}.png'))
                 cards.append('<img width="400" height="240" src="data:image/png;base64,' +
                              base64.b64encode(png).decode() + '">')

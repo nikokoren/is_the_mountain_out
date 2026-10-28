@@ -89,6 +89,23 @@ test('Provider failure yields UNKNOWN without losing a current community observa
   }finally{await mf.dispose();}
 });
 
+test('QR opt-in accepts common checkbox encodings and returns a native feedback URL',async()=>{
+  const {mf,request}=await runtime();
+  try{
+    for(const enabled of ['true','TRUE','1','yes','on']){
+      const response=await (await request('/api/visibility?feedback='+enabled)).json();
+      assert.equal(response.feedback_ready,true);
+      assert.match(response.feedback_url,/^https:\/\/mountain\.test\/f\/[a-f0-9]{24}$/);
+      assert.equal(response.feedback_qr_path.replace('/q/','/f/'),'/' + response.feedback_url.split('/').slice(3).join('/'));
+    }
+    for(const disabled of ['false','0','no','off']){
+      const response=await (await request('/api/visibility?feedback='+disabled)).json();
+      assert.equal(response.feedback_ready,false);
+      assert.equal(response.feedback_url,undefined);
+    }
+  }finally{await mf.dispose();}
+});
+
 test('Normal requests clean expired data without cron, preserving fresh data and throttling cleanup',async()=>{
   const {mf,db,request}=await runtime();
   const pause=()=>new Promise(resolve=>setTimeout(resolve,20));

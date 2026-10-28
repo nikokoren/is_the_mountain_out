@@ -51,7 +51,7 @@ custom_fields:
     options:
       - Portland — Pittock Mansion: portland
   - keyname: show_feedback_qr
-    name: Show feedback QR code
+    name: Show feedback QR on full screen
     field_type: boolean
     default: false
-    description: Let viewers report current visibility. Requires feedback-enabled hosting with a public URL.
+    description: Show an inline QR with a Submit report label in the full-screen bottom-right corner. Hidden in mashups.

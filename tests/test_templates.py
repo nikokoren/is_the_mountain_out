@@ -33,6 +33,24 @@ class TemplateTests(unittest.TestCase):
             self.assertIn('/assets/cloud-bank.png', scene)
         self.assertNotIn('/assets/cloud-bank.png', scenes[4])
 
+    def test_native_qr_and_responsive_contract(self):
+        from tools.preview import render
+        for layout in SIZES:
+            html = render(layout=layout, feedback_url='https://mountain.test/f/example')
+            if layout == 'full':
+                self.assertIn('qr-code w--full h--auto', html)
+                self.assertIn('Submit report', html)
+                self.assertIn('absolute bottom--0 right--0', html)
+            else:
+                self.assertNotIn('qr-code', html)
+                self.assertNotIn('Submit report', html)
+            self.assertIn('data-fit-value="true"', html)
+            self.assertIn('grow w--full h--min-0', html)
+            self.assertNotIn('width="112"', html)
+            self.assertNotIn('height="300" viewBox', html)
+        self.assertNotIn('qr-code', render())
+        self.assertIn('qr-code', render(feedback_qr_path='/q/example'))
+
     def test_user_text_is_escaped(self):
         html = render(verdict='<script>alert(1)</script>')
         self.assertNotIn('<script>', html)

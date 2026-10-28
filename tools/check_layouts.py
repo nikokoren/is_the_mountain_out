@@ -1,62 +1,77 @@
-"""Check every fixture in system Chromium; no external requests needed."""
+"""Validate native responsive layout, text fitting and QR decoding across devices."""
+import io
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from playwright.sync_api import sync_playwright
-from tools.preview import SIZES, STATES, render
+from PIL import Image
+import zxingcpp
+from tools.preview import STATES, SIZES, render
+from tools.browser_support import install_assets, settle
+
+ROOT = Path(__file__).resolve().parents[1]
+DEVICES = [(None, 800, 480), ('v2', 1872, 1404), ('amazon_kindle_7', 800, 600),
+           ('palma', 1648, 824), ('kobo_forma', 1920, 1440)]
+URL = 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev/f/0123456789abcdef01234567'
+IMAGES = ['/assets/rainier-seattle.png', '/assets/rainier.png', '/assets/rainier-tacoma.png', '/assets/hood-portland.png']
 
 
 def main():
+    count = scans = 0
     with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True,
-                                    args=['--no-sandbox'])
+        browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
         page = browser.new_page()
-        def asset(route):
-            from urllib.parse import urlsplit
-            path = urlsplit(route.request.url).path
-            if path == '/css/3.4.0/plugins.css':
-                route.fulfill(path=str(Path('.venv/framework/plugins.css').resolve()), content_type='text/css')
-            elif path.startswith('/fonts/'):
-                route.fulfill(path=str((Path('.venv/framework') / path.lstrip('/')).resolve()))
-            elif path.startswith('/q/'):
-                from mountain.feedback import qr_svg
-                route.fulfill(body=qr_svg('https://mountain.example/f/abcdefghijklmnopqrstuvwx'), content_type='image/svg+xml')
-            elif path in ('/assets/rainier.png', '/assets/rainier-seattle.png', '/assets/rainier-tacoma.png', '/assets/hood-portland.png', '/assets/cloud-bank.png'):
-                route.fulfill(path=str(Path(path.lstrip('/')).resolve()), content_type='image/png')
-            else:
-                route.abort()
-        page.route('**/*', asset)
-        for feedback in (False, True):
-            for image_path in ('/assets/rainier-seattle.png', '/assets/rainier.png', '/assets/rainier-tacoma.png', '/assets/hood-portland.png'):
-                for layout, (width, height) in SIZES.items():
-                    page.set_viewport_size({'width': 800, 'height': 480})
-                    for state in STATES:
-                        page.set_content(render(state, layout, image_path=image_path, feedback_qr_path='/q/abcdefghijklmnopqrstuvwx' if feedback else None))
-                        page.evaluate('document.fonts.ready')
-                        assert page.locator('.view').inner_text().strip() == ('UNKNOWN' if state == 'unknown' else ['NOT OUT', 'KINDA OUT', 'HALFWAY OUT', 'MOSTLY OUT', 'MOUNTAIN OUT!'][STATES.index(state)])
-                        for element in page.locator('.layout > *').all():
-                            box = element.bounding_box()
-                            view = page.locator('.view').bounding_box()
-                            assert box['x'] >= view['x'] and box['y'] >= view['y'], (layout, state, box)
-                            assert box['x'] + box['width'] <= view['x'] + view['width'] + 1, (layout, state, box)
-                            assert box['y'] + box['height'] <= view['y'] + view['height'] + 1, (layout, state, box)
-                        dimensions = page.evaluate('''() => {
-                          const r = document.querySelector('.layout');
-                          return {height:r.scrollHeight, allowed:r.clientHeight,
-                                  width:r.scrollWidth, allowedWidth:r.clientWidth,
-                                  svg:document.querySelector('svg').getBoundingClientRect().height};
-                        }''')
-                        assert dimensions['height'] <= dimensions['allowed'], (layout, state, dimensions)
-                        assert dimensions['width'] <= dimensions['allowedWidth'], (layout, state, dimensions)
-                        assert dimensions['svg'] >= 30, (layout, state, dimensions)
-        page.set_content(render('mountain_out', 'full'))
-        page.evaluate('document.fonts.ready')
-        page.locator('.screen').screenshot(path='docs/clear-fixture.png')
-        page.set_content(render('mountain_out', 'full', feedback_qr_path='/q/abcdefghijklmnopqrstuvwx'))
-        page.evaluate('document.fonts.ready')
-        page.locator('.screen').screenshot(path='docs/feedback-qr-preview.png')
+        install_assets(page)
+        for device, width, height in DEVICES:
+            for portrait in (False, True):
+                page.set_viewport_size({'width': height if portrait else width, 'height': width if portrait else height})
+                for layout in SIZES:
+                    for feedback in (False, True):
+                        # All artwork/states on the original screen; longest verdict and
+                        # unknown on every other device/orientation/view/QR combination.
+                        images = IMAGES if device is None and not portrait else IMAGES[:1]
+                        states = STATES if device is None and not portrait else ['mountain_out', 'unknown']
+                        for image_path in images:
+                            for state in states:
+                                case = (device, portrait, layout, feedback, image_path, state)
+                                page.set_content(render(state, layout, device=device, portrait=portrait,
+                                                        image_path=image_path, feedback_url=URL if feedback else None, feedback_qr_path='/q/0123456789abcdef01234567' if feedback else None))
+                                settle(page)
+                                bounds = page.locator('.screen').bounding_box()
+                                assert round(bounds['width']) == (height if portrait else width), case
+                                assert round(bounds['height']) == (width if portrait else height), case
+                                actual = page.locator('.value').inner_text()
+                                assert actual == ('UNKNOWN' if state == 'unknown' else ['NOT OUT','KINDA OUT','HALFWAY OUT','MOSTLY OUT','MOUNTAIN OUT!'][STATES.index(state)]), case
+                                metrics = page.locator('.view').evaluate("""view => {
+                                  const outer=view.getBoundingClientRect();
+                                  const nodes=Array.from(view.querySelectorAll('div,.value,svg'));
+                                  return nodes.filter(n=>!n.closest('svg')||n.tagName==='svg').map(n=>{
+                                    const b=n.getBoundingClientRect();return {class:n.getAttribute('class'),x:b.x-outer.x,y:b.y-outer.y,w:b.width,h:b.height,
+                                      font:n.classList.contains('value')?parseFloat(getComputedStyle(n).fontSize):null};});
+                                }""")
+                                view = page.locator('.view').bounding_box()
+                                for item in metrics:
+                                    assert item['x'] >= -1 and item['y'] >= -1 and item['x']+item['w'] <= view['width']+1 and item['y']+item['h'] <= view['height']+1, (case,item,view)
+                                    if item['font'] is not None: assert item['font'] >= 12, (case,item)
+                                assert page.locator('svg.qr-code').count() == int(feedback and layout == 'full'), case
+                                if feedback and layout == 'full':
+                                    qr = page.locator('[aria-label="Scan to report whether the mountain is visible"]')
+                                    decoded = zxingcpp.read_barcode(Image.open(io.BytesIO(qr.screenshot())))
+                                    assert decoded and decoded.text == URL, (case, 'QR did not decode')
+                                    anchor=page.locator('[data-feedback-qr]').bounding_box()
+                                    content=page.locator('.layout > div').bounding_box()
+                                    assert abs(anchor['x']+anchor['width']-content['x']-content['width'])<=1, case
+                                    assert abs(anchor['y']+anchor['height']-content['y']-content['height'])<=1, case
+                                    assert page.locator('[data-feedback-qr] .label').inner_text()=='Submit report', case
+                                    scans += 1
+                                count += 1
+        for feedback, filename in [(False,'clear-fixture.png'),(True,'feedback-qr-preview.png')]:
+            page.set_viewport_size({'width':800,'height':480})
+            page.set_content(render(feedback_url=URL if feedback else None, feedback_qr_path='/q/0123456789abcdef01234567' if feedback else None))
+            settle(page)
+            page.locator('.screen').screenshot(path=str(ROOT/'docs'/filename))
         browser.close()
-    print('192 browser layout checks passed (official Framework 3.4.0 CSS and fonts; local Liquid harness).')
+    print(f'{count} responsive layout checks and {scans} decoded QR screenshots passed across 5 devices, both orientations and all four views; native Framework 3.4.0 CSS/JS/fonts.')
 
 
 if __name__ == '__main__':

@@ -2,3 +2,5 @@ python-liquid==2.1.0
 PyYAML==6.0.3
 playwright==1.56.0
 -r requirements.txt
+zxing-cpp==2.3.0
+Pillow==11.3.0

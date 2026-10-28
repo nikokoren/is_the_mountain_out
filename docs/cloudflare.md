@@ -53,7 +53,7 @@ is unbound, use **Settings → Bindings** to bind that D1 database with the name
 
 In the Private Plugin settings, set **Visibility service URL** to the new HTTPS
 origin with no trailing slash. Choose a mountain and its location. Turn on
-**Show feedback QR code** if you want community reports.
+**Show feedback QR on full screen** if you want community reports.
 
 Use the current files in `plugin/src/` for the polling URL, custom fields, Shared
 template and each layout tab. The recipe is pinned to Framework 3.4.0.
@@ -143,3 +143,9 @@ are blocked by the integration test, so tests do not prove live provider access.
 The Python server remains a local development/reference implementation. Its
 collector stores and compares reports but does not override weather verdicts;
 the hosted Worker implements the agreed community-vote policy.
+
+The latest responsive templates show the QR only on Full, at the bottom-right,
+with a **Submit report** label. Mashup views omit it. The API returns `feedback_url`
+for TRMNL's native inline QR filter; existing `feedback_qr_path` responses remain
+supported by the template. After changing settings or templates, refresh the
+polling data before checking the Full preview.

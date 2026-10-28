@@ -78,8 +78,8 @@ No TRMNL account access, public deployment, or physical device was supplied for
 this build. Hosted rendering and physical e-paper output require this final check.
 Framework 3.4.0 is pinned explicitly.
 
-The templates use native Framework layout, spacing and value typography, shared
-named templates, and escaped verdict text. There are no custom CSS rules. The
+The templates use native Framework flex/size/position utilities, dynamic text fitting, shared
+named templates, and escaped verdict text. There are no custom CSS rules or fixed rendered image dimensions. The
 Rainier images are generated illustrations, not photographs. The Seattle artwork
 was revised using the user-supplied Seattle photograph as a perspective reference:
 a broad domed summit with Little Tahoma far to the left. It is not a surveyed tracing. The API selects one of four mountain/viewpoint image assets. Native Framework
@@ -100,9 +100,9 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 38 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 39 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
-missing data, and all 192 mountain/viewpoint/state/layout/QR combinations. The preview harness adapts
+missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
 Framework 3.4.0 CSS and fonts. It does **not** substitute for the hosted renderer.
 
@@ -248,3 +248,36 @@ report and disagreement review with temporary data and fixture weather. Previews
 and [receipt with recent reports](docs/feedback-receipt-preview.png).
 The QR in the display preview is an example-domain fixture, not a live collection link.
 Public hosting, physical QR scanability, and TRMNL rendering remain deployment checks.
+
+## Adaptive display and full-screen QR
+
+The Shared template uses Framework 3.4.0 flex growth, minimum-size utilities,
+`data-fit-value` and native position classes. The SVG viewBox is only its drawing
+coordinate system; width and height come from the available view, not pixel
+arguments for each layout. The same content adapts to native device resolutions,
+pixel ratios, portrait/landscape orientation and mashup dimensions.
+
+The optional QR appears **only on Full**, anchored with native `absolute bottom--0
+right--0` utilities inside the framework content area. A native small label below
+it reads **Submit report**. Space is reserved so the image and verdict do not overlap
+it. Half Horizontal, Half Vertical and Quadrant never render the QR or caption.
+TRMNL's native `qr_code` Liquid filter draws it inline, avoiding an extra SVG image
+fetch. Its native width bounds and white quiet zone preserve scanability while
+scaling to the device. The QR URL comes from `feedback_url`, with a fallback for
+older `feedback_qr_path` polling responses.
+
+The checkbox still needs the correct polling URL from `settings.yml` to request
+feedback metadata. If the QR is absent on Full, refresh polling and check for
+`feedback_ready: true` and `feedback_url` (or `feedback_qr_path`) in its response.
+The Worker also accepts common true/yes/on/1 encodings for checkbox integrations.
+
+The browser harness now loads the **actual Framework 3.4.0 JavaScript**, not only
+its CSS/fonts, so native text fitting runs. Cache `public/js/3.4.0/plugins.js` at
+`.venv/framework/plugins.js` alongside the CSS/fonts when refreshing framework assets.
+The local native-filter adapter uses Python's QR encoder; hosted TRMNL uses its
+own filter. Browser checks decode QR screenshots with ZXing as well as checking
+content bounds and bottom-right anchoring.
+
+Create a TRMNL import ZIP with `.venv/bin/python tools/package_plugin.py`.
+Use `--service-url https://YOUR-HOST --enable-feedback` to prefill an installation;
+the standard source settings still leave the QR opt-in disabled by default.

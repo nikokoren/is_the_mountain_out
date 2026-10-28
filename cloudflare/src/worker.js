@@ -126,10 +126,11 @@ async function route(request,env){
     result.checked_at=iso(now());
     const formatter=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZoneName:'short'});
     for(const field of ['checked_at','forecast_at','fetched_at'])result[field+'_label']=result[field]?formatter.format(new Date(result[field])):'Unavailable';
-    if(url.searchParams.get('feedback')==='true'){
+    result.feedback_ready=false;
+    if(['true','1','yes','on'].includes((url.searchParams.get('feedback')??'').trim().toLowerCase())){
       const token=randomHex(12);
       await env.DB.prepare('INSERT INTO contexts(token,created,snapshot) VALUES (?,?,?)').bind(token,now(),JSON.stringify(result)).run();
-      result.feedback_ready=true;result.feedback_qr_path='/q/'+token;
+      result.feedback_ready=true;result.feedback_qr_path='/q/'+token;result.feedback_url=url.origin+'/f/'+token;
     }
     return output(result);
   }
