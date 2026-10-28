@@ -7,7 +7,7 @@
     {% assign qr_url = image_origin | append: feedback_page %}
   {% endif %}
 {% endif %}
-<div class="flex flex--col w--full h--full gap--small relative">
+<div class="flex flex--col flex--bottom w--full h--full gap--small relative">
   <div class="w--full h--[52cqh] h--min-0 no-shrink" data-mountain-region>
 {% assign state = status | default: 'unknown' %}
 {% comment %}Frame out the source artwork's white bottom margin, keeping its visible base anchored.{% endcomment %}
@@ -39,8 +39,15 @@
   {% endif %}
 </svg>
   </div>
-  <div class="flex flex--center-x flex--center-y w--full no-shrink{% if qr_url != '' %} px--32 lg:px--24{% endif %}" data-verdict-region>
-    <div class="flex flex--center-x flex--center-y w--full w--min-0">
+  <div class="w--full no-shrink relative" data-verdict-region>
+    {% if allow_feedback %}
+    <!-- Match the QR's height even when disabled, keeping the composition stable. -->
+    <div class="w--32 lg:w--24" aria-hidden="true">
+      <div class="aspect--1/1 w--full"></div>
+      <span class="label label--small block">&nbsp;</span>
+    </div>
+    {% endif %}
+    <div class="flex flex--center-x flex--center-y w--full w--min-0{% if allow_feedback %} absolute top--0 px--32 lg:px--24{% endif %}">
       <span class="value value--large lg:value--xxlarge no-shrink" data-fit-value="true">{{ verdict | default: 'UNKNOWN' | escape }}</span>
     </div>
   </div>

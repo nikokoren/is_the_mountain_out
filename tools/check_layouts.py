@@ -57,9 +57,8 @@ def main():
                                 assert abs(mountain['height'] / content['height'] - .52) < .005, case
                                 gap = verdict['y'] - mountain['y'] - mountain['height']
                                 assert 0 < gap <= content['height'] * .05, (case, gap)
-                                assert abs(verdict['height'] - text['height']) < 1, case
+                                assert abs(text['y'] - verdict['y']) < 1, case
                                 assert abs(text['x'] + text['width']/2 - content['x'] - content['width']/2) < 1, case
-                                assert abs(text['y'] + text['height']/2 - verdict['y'] - verdict['height']/2) < 1, case
                                 assert page.locator('[data-mountain-region] > svg').get_attribute('preserveAspectRatio') == 'xMidYMax meet', case
                                 for item in metrics:
                                     assert item['x'] >= -1 and item['y'] >= -1 and item['x']+item['w'] <= view['width']+1 and item['y']+item['h'] <= view['height']+1, (case,item,view)
@@ -70,6 +69,7 @@ def main():
                                     decoded = zxingcpp.read_barcode(Image.open(io.BytesIO(qr.screenshot())))
                                     assert decoded and decoded.text == URL, (case, 'QR did not decode')
                                     anchor=page.locator('[data-feedback-qr]').bounding_box()
+                                    assert abs(text['y'] - anchor['y']) < 1, (case, text, anchor)
                                     # Approximate one-inch square including the quiet zone:
                                     # OG ~125 ppi; X ~176 ppi, with native 1.8x scaling.
                                     if device is None or device == 'v2':
