@@ -20,8 +20,8 @@ proxy, custom domain or server-management commands are needed.
 5. Select **Deploy**. When it finishes, open the generated **`.workers.dev`** address.
    The landing page gives you the exact service URL to copy into TRMNL.
 
-The root `wrangler.jsonc` declares the Worker, static artwork, D1 binding and hourly
-cleanup. Cloudflare provisions D1; the application creates its initial tables
+The root `wrangler.jsonc` declares the Worker, static artwork and D1 binding.
+No Cron Trigger is required. Cloudflare provisions D1; the application creates its initial tables
 automatically on its first API request. Keep that database when redeploying.
 Do not create an R2 bucket or purchase a domain for this recipe.
 
@@ -114,8 +114,12 @@ Review disagreement cases early in the pilot. Compare timestamps and viewpoint
 before attributing a difference to a model error. Keep uncertainty and conflicting
 answers visible; don't claim calibrated probabilities from a small group.
 
-The hourly scheduled task deletes expired two-hour QR contexts, weather cache older
-than a day, and report history older than 90 days. No raw-report export is exposed
+Normal polling/submission requests trigger background cleanup at most once per hour,
+using an atomic D1 claim shared across Worker instances. Cleanup deletes expired
+two-hour QR contexts, weather cache older than a day, and report history older than
+90 days. During inactivity, physical deletion waits for the next request, but
+expired votes and QR links stop working on time regardless of cleanup. This avoids
+consuming one of the account's limited free Cron Trigger slots. No raw-report export is exposed
 on the public website. Preserve the D1 database across deployments and apply the
 same retention policy to exports/backups. The Python development server's SQLite
 database is separate; existing local data is not silently migrated into D1.

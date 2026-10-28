@@ -20,7 +20,7 @@ export function form(snapshot,token,csrf){
   <form method="post" action="/feedback"><input type="hidden" name="token" value="${escape(token)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
   <fieldset><legend>What can you see?</legend>${opts}</fieldset>
   <label><input type="checkbox" name="present" value="yes" required>I’m at or near this viewpoint and looking now.</label><button type="submit">Send observation</button></form>
-  <small>No name, photo, GPS or IP address is stored by this application. A random first-party cookie lets your latest report replace your previous vote. Reports count for 20 minutes; history is kept for up to 90 days. Community reports are unverified and may disagree. The weather estimate is retained separately.</small>`);
+  <small>No name, photo, GPS or IP address is stored by this application. A random first-party cookie lets your latest report replace your previous vote. Reports count for 20 minutes; history is normally retained for 90 days. Community reports are unverified and may disagree. The weather estimate is retained separately.</small>`);
 }
 export function receipt(snapshot,answer,counts){
   const weather=snapshot.weather_estimate??snapshot;

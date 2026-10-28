@@ -88,3 +88,38 @@ test('Provider failure yields UNKNOWN without losing a current community observa
     assert.equal(data.viewpoint,'portland');
   }finally{await mf.dispose();}
 });
+
+test('Normal requests clean expired data without cron, preserving fresh data and throttling cleanup',async()=>{
+  const {mf,db,request}=await runtime();
+  const pause=()=>new Promise(resolve=>setTimeout(resolve,20));
+  const awaitDeletion=async token=>{
+    for(let attempt=0;attempt<100;attempt++){
+      if(!await db.prepare('SELECT token FROM contexts WHERE token=?').bind(token).first())return;
+      await pause();
+    }
+    assert.fail('Background cleanup did not remove the expired context');
+  };
+  try{
+    const t=Date.now()/1000;
+    const expired='a'.repeat(24),fresh='b'.repeat(24);
+    await db.prepare('INSERT INTO contexts VALUES (?,?,?)').bind(expired,t-7201,'{}').run();
+    await db.prepare('INSERT INTO contexts VALUES (?,?,?)').bind(fresh,t,'{}').run();
+    await db.prepare('INSERT INTO weather_cache VALUES (?,?,?)').bind('old',t-86401,'{}').run();
+    await db.prepare('INSERT INTO reports(received,mountain,viewpoint,answer,browser_hash,context_token,snapshot) VALUES (?,?,?,?,?,?,?)').bind(t-91*86400,'rainier','seattle','out','old','old','{}').run();
+    await request('/api/visibility');await awaitDeletion(expired);
+    assert.ok(await db.prepare('SELECT token FROM contexts WHERE token=?').bind(fresh).first());
+    // All statements in the D1 batch are complete when these checks run.
+    for(let i=0;i<100 && await db.prepare("SELECT key FROM weather_cache WHERE key='old'").first();i++)await pause();
+    assert.equal(await db.prepare("SELECT key FROM weather_cache WHERE key='old'").first(),null);
+    assert.equal(await db.prepare("SELECT id FROM reports WHERE browser_hash='old'").first(),null);
+    const lease=await db.prepare("SELECT value FROM settings WHERE name='last_cleanup'").first();
+    assert.ok(Number(lease.value)>=t);
+    await db.prepare('INSERT INTO contexts VALUES (?,?,?)').bind(expired,t-7201,'{}').run();
+    await request('/api/visibility');await pause();
+    assert.ok(await db.prepare('SELECT token FROM contexts WHERE token=?').bind(expired).first(),'the next request does not repeat cleanup within an hour');
+    await db.prepare("UPDATE settings SET value='0' WHERE name='last_cleanup'").run();
+    await request('/api/visibility');await awaitDeletion(expired);
+    const config=JSON.parse(readFileSync('../wrangler.jsonc','utf8'));
+    assert.deepEqual(config.triggers.crons,[]);
+  }finally{await mf.dispose();}
+});

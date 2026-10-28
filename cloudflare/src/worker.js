@@ -90,6 +90,21 @@ async function cleanup(env){
     env.DB.prepare('DELETE FROM weather_cache WHERE fetched<?').bind(t-86400)]);
 }
 
+async function maybeCleanup(env){
+  await init(env);
+  const t=now();
+  // D1 atomically claims one cleanup slot per hour across all Worker isolates.
+  // No Cron Trigger is needed; ordinary recipe polling drives housekeeping.
+  const claimed=await env.DB.prepare(`INSERT INTO settings(name,value) VALUES ('last_cleanup',?)
+    ON CONFLICT(name) DO UPDATE SET value=excluded.value
+    WHERE CAST(settings.value AS REAL)<=? RETURNING value`).bind(String(t),t-3600).first();
+  if(!claimed)return;
+  try{await cleanup(env);}catch{
+    // A transient failure can be retried by the next request.
+    await env.DB.prepare("UPDATE settings SET value='0' WHERE name='last_cleanup' AND value=?").bind(String(t)).run();
+  }
+}
+
 async function route(request,env){
   const url=new URL(request.url),path=url.pathname;
   if(request.method==='GET' && path.startsWith('/assets/')){
@@ -158,11 +173,16 @@ async function route(request,env){
 }
 
 export default {
-  async fetch(request,env){
-    try{return await route(request,env);}catch{
+  async fetch(request,env,ctx){
+    try{
+      const response=await route(request,env);
+      if(response.status<500 && ['/api/visibility','/feedback'].includes(new URL(request.url).pathname)){
+        ctx.waitUntil(maybeCleanup(env));
+      }
+      return response;
+    }catch{
       // Keep database/credentials, IPs and submitted tokens out of application logs.
       return html('Temporarily unavailable','<h1>Temporarily unavailable</h1><p>Please try again later.</p>',503);
     }
-  },
-  async scheduled(controller,env,ctx){ctx.waitUntil(cleanup(env));}
+  }
 };
