@@ -17,7 +17,7 @@
 {% elsif image_path == '/assets/hood-portland.png' %}{% assign scene_height = 243 %}{% endif %}
 {% if state == 'unknown' %}{% assign scene_height = 252 %}
 {% elsif state == 'not_out' %}{% assign scene_height = 188 %}{% endif %}
-<svg class="w--full h--full" viewBox="0 0 736 {{ scene_height }}" preserveAspectRatio="xMidYMax meet" role="img" aria-label="Illustrated mountain visibility estimate: {{ state | escape }}. Cloud positions are symbolic.">
+<svg class="w--full h--full" viewBox="0 0 736 {{ scene_height }}" preserveAspectRatio="xMidYMax meet">
   {% unless state == 'unknown' %}
   <image href="{{ image_origin | escape }}{{ image_path | default: '/assets/rainier-seattle.png' | escape }}" x="0" y="0" width="736" height="300" preserveAspectRatio="xMidYMid meet" />
   {% endunless %}
@@ -42,7 +42,7 @@
   <div class="w--full no-shrink relative" data-verdict-region>
     {% if allow_feedback %}
     <!-- Match the QR's height even when disabled, keeping the composition stable. -->
-    <div class="w--32 lg:w--24" aria-hidden="true">
+    <div class="w--32 lg:w--24">
       <div class="aspect--1/1 w--full"></div>
       <span class="label label--small block">&nbsp;</span>
     </div>
@@ -53,7 +53,7 @@
   </div>
   {% if qr_url != '' %}
   <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
-    <div class="w--full p--3" aria-label="Scan to report whether the mountain is visible">
+    <div class="w--full p--3">
       {{ qr_url | qr_code: 1, 'l' | replace: 'class="qr-code"', 'class="qr-code w--full h--auto block"' }}
     </div>
     <span class="label label--small block text--center">Submit report</span>

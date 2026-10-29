@@ -65,7 +65,7 @@ def main():
                                     if item['font'] is not None: assert item['font'] >= 12, (case,item)
                                 assert page.locator('svg.qr-code').count() == int(feedback and layout == 'full'), case
                                 if feedback and layout == 'full':
-                                    qr = page.locator('[aria-label="Scan to report whether the mountain is visible"]')
+                                    qr = page.locator('[data-feedback-qr] > .p--3')
                                     decoded = zxingcpp.read_barcode(Image.open(io.BytesIO(qr.screenshot())))
                                     assert decoded and decoded.text == URL, (case, 'QR did not decode')
                                     anchor=page.locator('[data-feedback-qr]').bounding_box()
