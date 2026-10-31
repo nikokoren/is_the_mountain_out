@@ -48,8 +48,11 @@
       <span class="label label--small block">&nbsp;</span>
     </div>
     {% endif %}
-    <div class="flex flex--center-x flex--center-y w--full w--min-0{% if allow_feedback %} absolute top--0 px--32 lg:px--24{% endif %}">
-      <span class="value value--large lg:value--xxlarge no-shrink" data-fit-value="true">{{ verdict | default: 'UNKNOWN' | escape }}</span>
+    <div class="w--full{% if allow_feedback %} absolute top--0 px--32 lg:px--24{% endif %}">
+      <!-- Fit against the actual content width, excluding the QR gutters. -->
+      <div class="flex flex--center-x flex--center-y w--full w--min-0">
+        <span class="value value--large lg:value--xxlarge lg:portrait:value--xlarge no-shrink" data-fit-value="true">{{ verdict | default: 'UNKNOWN' | escape }}</span>
+      </div>
     </div>
   </div>
   {% if qr_url != '' %}

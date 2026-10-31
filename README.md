@@ -106,7 +106,7 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 44 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 45 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official

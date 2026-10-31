@@ -111,7 +111,7 @@ has not been inferred or added during this review.
 ## Local validation
 
 Validated on 2026-10-31: deployment dry run and seven Worker/D1 tests passed;
-all 44 Python tests passed, including active-mountain polling selection,
+all 45 Python tests passed, including active-mountain polling selection,
 default fields, feedback encodings, legacy-field independence and consistent
 polling/artwork origins in the default and maintainer-override exports;
 the browser feedback flow saved an observation and verified its receipt/review;
@@ -125,6 +125,19 @@ The author confirmed the shared production origin, but a direct health request
 from this environment was denied by its network proxy with HTTP 403. This does
 not establish a Worker outage. Its hostname was added to the saved environment
 network draft; runtime verification needs those settings applied.
+
+Follow-up on Termy's review of recipe 522027: see the
+[reproduction and corrections](termy-review.md). The author confirmed that literal
+doubled quotes reached the installed polling field, so Termy's diagnosis of the
+installed recipe is correct. The previous ZIP used valid YAML escaping, but those
+escapes must not be copied literally into Liquid. The new export uses a double-quoted, single-line
+polling value to avoid confusion without changing the parsed Liquid. X portrait
+verdict overlap with the Full-layout QR was reproduced and fixed using the
+Framework's `lg:portrait:value--xlarge` class and a nested native flex container
+that lets text fitting measure the space remaining after the QR gutters.
+The nesting also fixes the OG portrait case found by the stronger checks.
+Browser checks now explicitly test
+verdict glyphs against the QR's bounds, in addition to view bounds and QR decoding.
 
 Use the existing commands from the repository root:
 

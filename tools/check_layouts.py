@@ -69,6 +69,15 @@ def main():
                                     decoded = zxingcpp.read_barcode(Image.open(io.BytesIO(qr.screenshot())))
                                     assert decoded and decoded.text == URL, (case, 'QR did not decode')
                                     anchor=page.locator('[data-feedback-qr]').bounding_box()
+                                    # View bounds alone miss text hidden behind an
+                                    # opaque QR. Check the actual text glyph range.
+                                    glyphs=page.locator('.value').evaluate("""el => {
+                                      const range=document.createRange();range.selectNodeContents(el);
+                                      const r=range.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};
+                                    }""")
+                                    overlap_x=min(glyphs['x']+glyphs['w'],anchor['x']+anchor['width'])-max(glyphs['x'],anchor['x'])
+                                    overlap_y=min(glyphs['y']+glyphs['h'],anchor['y']+anchor['height'])-max(glyphs['y'],anchor['y'])
+                                    assert overlap_x <= 1 or overlap_y <= 1, (case, 'Verdict hidden by QR', glyphs, anchor)
                                     assert abs(text['y'] - anchor['y']) < 1, (case, text, anchor)
                                     # Approximate one-inch square including the quiet zone:
                                     # OG ~125 ppi; X ~176 ppi, with native 1.8x scaling.

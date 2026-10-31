@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 import yaml
+from liquid import Environment
+from urllib.parse import urlsplit, parse_qs
 from tools.package_plugin import build_package
 
 ORIGIN = 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev'
@@ -45,3 +47,19 @@ class PackageTests(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     build_package(path, value)
                 self.assertFalse(path.exists())
+
+    def test_exported_polling_url_round_trips_and_selects_hood(self):
+        root = Path(__file__).resolve().parents[1]
+        source = yaml.safe_load((root / 'plugin/src/settings.yml').read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            with ZipFile(build_package(Path(directory) / 'recipe.zip')) as archive:
+                raw = archive.read('settings.yml').decode()
+        polling_line = next(line for line in raw.splitlines() if line.startswith('polling_url:'))
+        self.assertTrue(polling_line.startswith('polling_url: "'))
+        self.assertNotIn("''hood''", polling_line)
+        exported = yaml.safe_load(raw)
+        self.assertEqual(exported['polling_url'], source['polling_url'])
+        url = Environment().from_string(exported['polling_url']).render(
+            mountain='hood', rainier_viewpoint='paradise', hood_viewpoint='portland')
+        self.assertEqual(parse_qs(urlsplit(url).query), {
+            'mountain': ['hood'], 'viewpoint': ['portland'], 'feedback': ['false']})

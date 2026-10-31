@@ -11,6 +11,18 @@ sys.path.insert(0, str(ROOT))
 from mountain.feedback import public_origin
 
 
+class PollingURL(str):
+    """Keep Liquid's quotes literal and the URL on one line in the export."""
+
+
+class RecipeDumper(yaml.SafeDumper):
+    pass
+
+
+RecipeDumper.add_representer(PollingURL, lambda dumper, value: dumper.represent_scalar(
+    'tag:yaml.org,2002:str', str(value), style='"'))
+
+
 def build_package(output, service_url=None, enable_feedback=False):
     settings = yaml.safe_load((ROOT / 'plugin/src/settings.yml').read_text())
     templates = {file.name: file.read_text() for file in sorted((ROOT / 'plugin/src').glob('*.liquid'))}
@@ -35,7 +47,9 @@ def build_package(output, service_url=None, enable_feedback=False):
     with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
         for name, markup in templates.items():
             archive.writestr(name, markup)
-        archive.writestr('settings.yml', yaml.safe_dump(settings, sort_keys=False, allow_unicode=True))
+        export_settings = {**settings, 'polling_url': PollingURL(settings['polling_url'])}
+        archive.writestr('settings.yml', yaml.dump(export_settings, Dumper=RecipeDumper,
+                                               sort_keys=False, allow_unicode=True, width=4096))
     with ZipFile(output) as archive:
         assert archive.testzip() is None
         assert set(archive.namelist()) == {'settings.yml', 'shared.liquid', 'full.liquid', 'half_horizontal.liquid', 'half_vertical.liquid', 'quadrant.liquid'}
