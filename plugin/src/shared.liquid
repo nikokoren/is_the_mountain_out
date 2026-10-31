@@ -18,7 +18,7 @@
 {% elsif image_path == '/assets/hood-portland.png' %}{% assign scene_height = 243 %}{% endif %}
 {% if state == 'unknown' %}{% assign scene_height = 252 %}
 {% elsif state == 'not_out' %}{% assign scene_height = 188 %}{% endif %}
-<svg class="w--full h--full" viewBox="0 0 736 {{ scene_height }}" preserveAspectRatio="xMidYMax meet">
+<svg class="w--full h--full image-dither" viewBox="0 0 736 {{ scene_height }}" preserveAspectRatio="xMidYMax meet">
   {% unless state == 'unknown' %}
   <image href="{{ image_origin | escape }}{{ image_path | default: '/assets/rainier-seattle.png' | escape }}" x="0" y="0" width="736" height="300" preserveAspectRatio="xMidYMid meet" />
   {% endunless %}

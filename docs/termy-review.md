@@ -70,3 +70,15 @@ Centering content moves the whitespace but does not reduce it. Adding a viewpoin
 name would change the deliberately minimal mountain-and-verdict design, so this
 review does not add text or claim that the layout-density feedback is resolved.
 See the [layout review sheet](publishing-layouts.png).
+
+## Cloud artwork on 1-bit displays
+
+Termy reported solid black clouds in X portrait Half Vertical and Quadrant and
+verified that `image-dither` on the shared scene SVG preserves the cloud texture.
+The SVG now carries that native Framework marker in every layout. The separately
+rendered feedback QR is unaffected.
+
+TRMNL applies image dithering in its platform renderer; the local Framework
+CSS/JavaScript does not perform that conversion. Local checks verify the export,
+template rendering and cloud asset references, but the affected layouts should
+also be refreshed in TRMNL's hosted 1-bit preview after importing the updated ZIP.
