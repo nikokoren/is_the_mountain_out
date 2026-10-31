@@ -6,20 +6,25 @@ refresh_interval: 15
 no_screen_padding: 'no'
 dark_mode: 'no'
 polling_verb: get
-polling_url: "{{ service_url }}/api/visibility?mountain={{ mountain | default: 'rainier' }}&viewpoint={% if mountain == 'hood' %}{{ hood_viewpoint | default: 'portland' }}{% else %}{{ rainier_viewpoint | default: 'seattle' }}{% endif %}&feedback={{ show_feedback_qr | default: 'false' }}"
+polling_url: "https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev/api/visibility?mountain={{ mountain | default: 'rainier' }}&viewpoint={% if mountain == 'hood' %}{{ hood_viewpoint | default: 'portland' }}{% else %}{{ rainier_viewpoint | default: 'seattle' }}{% endif %}&feedback={{ show_feedback_qr | default: 'false' }}"
 polling_headers: ''
 polling_body: ''
 custom_fields:
   - keyname: author_bio
     name: About this recipe
     field_type: author_bio
-    description: An uncalibrated weather estimate for Mount Rainier, not a confirmed observation.
+    category: life
+    description: >-
+      Weather estimates for Mount Rainier / Tahoma and Mount Hood / Wy’east,
+      with optional unverified community reports. Estimates are uncalibrated,
+      and illustrations are not live camera images.<br/>
+      Choose a mountain and viewpoint. The author's shared service supplies the
+      data and artwork; no deployment, Cloudflare account or API key is needed.
+      Refreshes every 15 minutes. Feedback reports are shared with other users
+      at the same viewpoint.<br/>
+      <a href="https://github.com/nikokoren/is_the_mountain_out/issues">Contact the author or report a problem</a>.
     github_url: https://github.com/nikokoren/is_the_mountain_out
-  - keyname: service_url
-    name: Visibility service URL
-    field_type: string
-    description: Your deployed HTTPS service origin, without a trailing slash.
-    placeholder: https://mountain.example.com
+    learn_more_url: https://github.com/nikokoren/is_the_mountain_out/blob/main/README.md
   - keyname: mountain
     name: Mountain to view
     field_type: select

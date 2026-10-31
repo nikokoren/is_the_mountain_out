@@ -113,7 +113,7 @@ async function route(request,env){
     const assetURL=new URL(url);assetURL.pathname=path.slice(7);
     return env.ASSETS.fetch(new Request(assetURL,request));
   }
-  if(request.method==='GET' && path==='/')return output(home(url.origin),200,'text/html; charset=utf-8');
+  if(request.method==='GET' && path==='/')return output(home(),200,'text/html; charset=utf-8');
   if(request.method==='GET' && path==='/health'){
     await init(env);await env.DB.prepare('SELECT 1').first();return output({status:'ok',storage:'d1'});
   }

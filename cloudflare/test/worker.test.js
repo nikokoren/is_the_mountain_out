@@ -36,7 +36,10 @@ async function vote(request,form,answer,extraHeaders={}){
 test('Worker serves assets, initializes D1 and uses persistent weather cache for all four views',async()=>{
   const {mf,request,upstream}=await runtime();
   try{
-    assert.match(await (await request('/')).text(),/Connect your TRMNL/);
+    const landing = await (await request('/')).text();
+    assert.match(landing,/Connect your TRMNL/);
+    assert.match(landing,/shared service automatically/);
+    assert.doesNotMatch(landing,/Set the recipe’s service URL/);
     for(const location of Object.values(viewpoints)){
       const response=await request(`/api/visibility?mountain=${location.mountain}&viewpoint=${location.id}`),data=await response.json();
       assert.equal(data.status,'mountain_out');assert.equal(data.display_basis,'weather');assert.equal(data.mountain,location.mountain);

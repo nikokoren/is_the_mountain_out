@@ -5,11 +5,12 @@ export function page(title,content){
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Is the Mountain Out?</title>
   <style>body{font:18px/1.5 system-ui,sans-serif;max-width:34rem;margin:3rem auto;padding:0 1.25rem;color:#111;background:#fff}h1{line-height:1.15}fieldset{border:0;padding:0}label{display:block;padding:.7rem 0}button{font:inherit;background:#111;color:white;border:0;border-radius:.3rem;padding:.8rem 1.2rem;width:100%;margin-top:1rem}small{display:block;margin-top:1.5rem}input{margin-right:.6rem}a{color:inherit}code{overflow-wrap:anywhere}</style></head><body>${content}</body></html>`;
 }
-export function home(origin){
+export function home(){
   return page('Is the Mountain Out?',`<h1>Is the Mountain Out?</h1><p>Weather estimates and short-lived community observations for Mount Rainier / Tahoma and Mount Hood / Wy’east.</p>
   <p>This service supplies the TRMNL recipe. To report a view, scan the QR code on your display.</p>
-  <h2>Connect your TRMNL</h2><p>Set the recipe’s service URL to:</p><code>${escape(origin)}</code>
-  <p>Choose a mountain and viewpoint, and enable the optional feedback QR.</p>
+  <h2>Connect your TRMNL</h2><p>Install the Is the Mountain Out? recipe, then choose a mountain and viewpoint. Enable the optional feedback QR if you want to report observations.</p>
+  <p>The recipe connects to the author’s shared service automatically. You do not need to deploy a backend, create a Cloudflare account or enter a service URL or API key.</p>
+  <p><a href="https://github.com/nikokoren/is_the_mountain_out#install-on-trmnl">Installation instructions</a></p>
   <p>Community reports count for 20 minutes from submission. They are self-reported, not independently verified. Conflicting current reports show UNKNOWN; when none remain, weather estimates resume.</p>
   <small>Weather: <a href="https://open-meteo.com/">Open-Meteo</a>. Weather estimates are uncalibrated, not confirmed observations. A TRMNL’s screen can remain unchanged until its next refresh.</small>`);
 }

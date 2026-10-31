@@ -3,6 +3,7 @@ from pathlib import Path
 from tools.preview import render, STATES, SIZES
 import yaml
 
+ORIGIN = 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev'
 
 class TemplateTests(unittest.TestCase):
     def test_every_layout_and_state(self):
@@ -45,7 +46,10 @@ class TemplateTests(unittest.TestCase):
                 self.assertNotIn('qr-code', html)
                 self.assertNotIn('Submit report', html)
             self.assertIn('data-fit-value="true"', html)
-            self.assertIn('grow w--full h--min-0', html)
+            # The scene and verdict remain separate responsive regions; actual
+            # bounds and QR placement are exercised by tools/check_layouts.py.
+            self.assertEqual(html.count('data-mountain-region'), 1)
+            self.assertEqual(html.count('data-verdict-region'), 1)
             self.assertNotIn('width="112"', html)
             self.assertNotIn('height="300" viewBox', html)
         self.assertNotIn('qr-code', render())
@@ -64,6 +68,40 @@ class TemplateTests(unittest.TestCase):
     def test_settings(self):
         settings = yaml.safe_load(Path('plugin/src/settings.yml').read_text())
         fields = {f['keyname'] for f in settings['custom_fields']}
-        self.assertTrue({'mountain', 'rainier_viewpoint', 'hood_viewpoint', 'service_url'} <= fields)
+        self.assertEqual(fields, {'author_bio', 'mountain', 'rainier_viewpoint', 'hood_viewpoint', 'show_feedback_qr'})
         self.assertEqual(settings['strategy'], 'polling')
         self.assertEqual(settings['framework_version'], '3.4.0')
+
+    def test_polling_uses_active_mountain_fields_and_feedback_encodings(self):
+        from liquid import Environment
+        from urllib.parse import urlsplit, parse_qs
+        settings = yaml.safe_load(Path('plugin/src/settings.yml').read_text())
+        polling = Environment().from_string(settings['polling_url'])
+        # Saved fields from the hidden dropdown must not select the other mountain.
+        for mountain, viewpoint in [('rainier', 'tacoma'), ('hood', 'portland')]:
+            for feedback in [True, False, 'true', 'false', 'yes', 'no', 'on', 'off', 1, 0]:
+                with self.subTest(mountain=mountain, feedback=feedback):
+                    url = polling.render(mountain=mountain, rainier_viewpoint='tacoma',
+                                         hood_viewpoint='portland', show_feedback_qr=feedback)
+                    self.assertEqual(urlsplit(url).scheme + '://' + urlsplit(url).netloc, ORIGIN)
+                    query = parse_qs(urlsplit(url).query)
+                    self.assertEqual(query['mountain'], [mountain])
+                    self.assertEqual(query['viewpoint'], [viewpoint])
+                    enabled = query['feedback'][0].lower() in ('true', 'yes', 'on', '1')
+                    self.assertEqual(enabled, feedback in (True, 'true', 'yes', 'on', 1))
+        defaults = parse_qs(urlsplit(polling.render()).query)
+        self.assertEqual(defaults, {'mountain': ['rainier'], 'viewpoint': ['seattle'], 'feedback': ['false']})
+
+    def test_shared_service_needs_no_settings_and_ignores_legacy_origin(self):
+        from tools.preview import qr_code
+        legacy = {'plugin_settings': {'custom_fields_values': {'service_url': 'https://old.example.com'}}}
+        for layout in SIZES:
+            for fields in ({}, {'trmnl': legacy}):
+                with self.subTest(layout=layout, legacy=bool(fields)):
+                    html = render('halfway_out', layout, feedback_qr_path='/q/example', **fields)
+                    self.assertIn(f'href="{ORIGIN}/assets/rainier-seattle.png"', html)
+                    self.assertIn(f'href="{ORIGIN}/assets/cloud-bank.png"', html)
+                    self.assertNotIn('old.example.com', html)
+                    if layout == 'full':
+                        svg = qr_code(ORIGIN + '/f/example').replace('class="qr-code"', 'class="qr-code w--full h--auto block"')
+                        self.assertIn(svg, html)

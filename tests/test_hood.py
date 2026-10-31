@@ -50,12 +50,12 @@ class HoodTests(unittest.TestCase):
         self.assertEqual(rules['rainier']['hidden'], ['hood_viewpoint'])
         self.assertEqual(rules['hood']['hidden'], ['rainier_viewpoint'])
         template = Environment().from_string(settings['polling_url'])
-        params = dict(service_url='https://example.test', mountain='hood',
+        params = dict(mountain='hood',
                       rainier_viewpoint='tacoma', hood_viewpoint='portland')
-        self.assertEqual(template.render(**params), 'https://example.test/api/visibility?mountain=hood&viewpoint=portland&feedback=false')
+        self.assertEqual(template.render(**params), 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev/api/visibility?mountain=hood&viewpoint=portland&feedback=false')
         params['mountain'] = 'rainier'
         self.assertTrue(template.render(**params).endswith('mountain=rainier&viewpoint=tacoma&feedback=false'))
-        self.assertTrue(template.render(service_url='https://example.test').endswith('mountain=rainier&viewpoint=seattle&feedback=false'))
+        self.assertTrue(template.render().endswith('mountain=rainier&viewpoint=seattle&feedback=false'))
 
     def test_http_target_image_and_mismatched_selection(self):
         server = ThreadingHTTPServer(('127.0.0.1', 0), handler(WeatherService(lambda *_: weather(visibility=120000), lambda: NOW)))

@@ -14,17 +14,20 @@ uncalibrated Seattle estimate, not a confirmed view. Terrain, cloud heights,
 darkness and webcam verification are not modelled. Paradise retains the local model.
 The preset selects both weather geometry and viewpoint-specific generated artwork.
 
-## Put it online
+## Shared service
 
-Use the [Cloudflare deployment guide](docs/cloudflare.md). It replaces the manual
-server-hosting instructions: Cloudflare handles HTTPS, the application and D1
-storage. Your existing Cloudflare account is enough to start.
+The recipe connects automatically to the author's shared Worker:
+`https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev`.
+Users choose a mountain and viewpoint, with optional feedback. No deployment,
+Cloudflare account, API key or service URL entry is required.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/nikokoren/is_the_mountain_out)
+Weather caching and community reports are shared across installations. A report
+can affect every user at the same mountain/viewpoint for 20 minutes, subject to
+device refresh. Conflicting current reports produce UNKNOWN.
 
-The hosted version includes the optional feedback QR and the agreed 20-minute
-community-vote policy. Local deployment tests pass; deployment into your account,
-live weather access there and physical TRMNL validation remain to be checked.
+The [Cloudflare guide](docs/cloudflare.md) is for the maintainer operating the
+shared service and developers making a separate fork. Hosted TRMNL rendering,
+live weather access and physical device output still require release checks.
 
 ## Local Python development (optional)
 
@@ -53,29 +56,32 @@ Other routes receive HTTP 404. See [model and data contract](docs/model.md).
 
 ## Install on TRMNL
 
-1. Follow [Deploy to Cloudflare](docs/cloudflare.md). After deployment, open the
-   landing page and copy its HTTPS service URL. The Python server commands above
-   are for local development, not the recommended public hosting setup.
-2. Create a Private Plugin using **Polling**, GET, and a 15-minute refresh.
-   Apply the settings in [plugin/src/settings.yml](plugin/src/settings.yml), pinned
-   to Framework **3.4.0**. Fill in your service's public HTTPS origin (no trailing
-   slash), and select the mountain. The conditional Rainier dropdown offers **Seattle — Kerry Park**,
+For submission copy, review assets, validation results and outstanding release
+checks, see the [publishing checklist](docs/publishing.md).
+
+1. Install the recipe in TRMNL once published, or
+   [download the recipe ZIP](releases/is-the-mountain-out.zip?raw=true)
+   and import it for prepublication testing. The maintainer builds that ZIP with
+   `.venv/bin/python tools/package_plugin.py`; the output is
+   `releases/is-the-mountain-out.zip`.
+2. Select the mountain. The conditional Rainier dropdown offers **Seattle — Kerry Park**,
    **Tacoma — Ruston Way**, and **Paradise**; the Hood dropdown offers
    **Portland — Pittock Mansion**. Only the chosen mountain’s dropdown is shown.
-   Replace older recipe fields/polling URLs with `mountain`, `rainier_viewpoint`,
-   and `hood_viewpoint`; the default remains Rainier/Seattle.
-3. Paste `shared.liquid` into Shared, `full.liquid` into Full, and the corresponding
-   half and quadrant templates into their layout tabs. These are Liquid snippets;
-   the TRMNL host provides the Framework and outer screen wrapper.
-4. Set the polling URL from `settings.yml`, substituting the custom fields via
-   TRMNL's Liquid interpolation. If configuring manually, an equivalent fixed URL
-   is `https://YOUR-HOST/api/visibility?viewpoint=seattle`.
-5. Run the plugin preview on TRMNL, inspect the returned JSON, and add it to your
-   device playlist. Confirm Full and your chosen mashup layout before publishing
-   the recipe. The backend must be reachable by TRMNL's servers, not just your device.
+   The default remains Rainier/Seattle.
+3. Optionally enable **Show feedback QR on full screen**. It is off by default
+   and never appears in mashups. Reports are shared with others at that viewpoint.
+4. Preview the plugin, then add it to your device playlist. Polling is GET with a
+   15-minute refresh, and Framework **3.4.0** is pinned. No backend setup is needed.
 
-No TRMNL account access, public deployment, or physical device was supplied for
-this build. Hosted rendering and physical e-paper output require this final check.
+For an existing private installation, import the new archive or replace settings
+and all five templates with `plugin/src/`. Remove the old `service_url` field;
+the new polling URL and shared template use the common Worker directly, so a
+previously saved value cannot redirect requests. Preview Full and your chosen
+mashup layout after refreshing polling data.
+
+The shared Worker URL was supplied by the author. Live reachability from this
+cloud environment remains blocked by its network policy; hosted rendering and
+physical e-paper output require the final release checks.
 Framework 3.4.0 is pinned explicitly.
 
 The templates use native Framework flex/size/position utilities, dynamic text fitting, shared
@@ -100,15 +106,17 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 39 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 44 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
 Framework 3.4.0 CSS and fonts. It does **not** substitute for the hosted renderer.
 
 For the official preview tool, install [trmnlp](https://github.com/usetrmnl/trmnlp),
-start this service, then run `trmnlp serve` from `plugin/`. Its local custom fields
-are supplied in `.trmnlp.yml`. This optional Ruby tool is not required by the service.
+run `trmnlp serve` from `plugin/`. Its local mountain/viewpoint fields are supplied
+in `.trmnlp.yml`, and polling uses the shared Worker. This optional Ruby tool is
+not required by the service. Test local backends directly or use the maintainer
+export override described in the Cloudflare guide.
 
 ## Python development notes
 
@@ -183,8 +191,8 @@ Hosted form behavior and physical device rendering still require TRMNL verificat
 
 ## Python development feedback collector
 
-For hosted deployment, follow the [Cloudflare guide](docs/cloudflare.md). The
-following is only for running the alternative Python collector yourself. Its
+The public recipe uses the shared Worker automatically. The following is only
+for developers running the alternative Python collector themselves. Its
 report history does not override the weather model. Enable **Show feedback QR code**
 in the recipe settings (off by default); this Python collector additionally needs
 its public origin and a persistent private data directory:
@@ -194,7 +202,9 @@ its public origin and a persistent private data directory:
   --public-url https://YOUR-HOST --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
 ```
 
-Use the same HTTPS origin for `service_url`. Only loopback development permits
+Use the collector's public origin for `--public-url`. To preview that collector
+with TRMNL, create a separate development ZIP using the maintainer
+`tools/package_plugin.py --service-url` override. Only loopback development permits
 HTTP. Avoid mounting the data directory under a publicly served path; protect it
 and its backups. The new GET `feedback=true` option returns `feedback_qr_path`
 only when collection is configured. If it is not configured, weather still works,
@@ -284,8 +294,11 @@ own filter. Browser checks decode QR screenshots with ZXing as well as checking
 content bounds and bottom-right anchoring.
 
 Create a TRMNL import ZIP with `.venv/bin/python tools/package_plugin.py`.
-Use `--service-url https://YOUR-HOST --enable-feedback` to prefill an installation;
-the standard source settings still leave the QR opt-in disabled by default.
+The default export uses the shared Worker and leaves QR opt-in disabled.
+Maintainers can use `--service-url https://YOUR-HOST` to export a separate fork
+or `--service-url http://127.0.0.1:8787` for local development. This updates polling
+and artwork together in the ZIP without adding a service URL field or changing
+the source recipe. `--enable-feedback` changes only the exported QR default.
 
 The full-screen QR uses native `w--32 lg:w--24` sizing: 128 layout pixels on
 TRMNL OG and 96 on TRMNL X. After the X's native 1.8× pixel ratio, that is about

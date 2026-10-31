@@ -44,7 +44,6 @@ def render(state='mountain_out', layout='full', device=None, portrait=False, **o
                 image_path='/assets/rainier-seattle.png', explanation='Clear conditions favour a view of the mountain.', location={'name': 'Paradise'},
                 forecast_at_label='Oct 27 12:00 PDT', checked_at_label='Oct 27 12:14 PDT')
     data.update(overrides)
-    data['trmnl'] = {'plugin_settings': {'custom_fields_values': {'service_url': 'https://mountain.test'}}}
     markup = env.from_string((ROOT / f'plugin/src/{layout}.liquid').read_text()).render(**data)
     mashups = {'half_horizontal': '1Tx1B', 'half_vertical': '1Lx1R', 'quadrant': '2x2'}
     opening = f'<div class="mashup mashup--{mashups[layout]}">' if layout in mashups else ''

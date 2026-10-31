@@ -1,6 +1,12 @@
-# Put the recipe online with Cloudflare
+# Maintain the shared Cloudflare service
 
-This is the recommended hosting path. Cloudflare handles HTTPS, the running
+This guide is for the recipe maintainer and developers deploying a separate fork.
+Recipe users do not follow these steps: they install the recipe, choose a
+mountain/viewpoint and optionally enable feedback.
+
+The public recipe's shared origin is
+`https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev`.
+Cloudflare handles HTTPS, the running
 application, artwork hosting and persistent D1 storage. No Python server, reverse
 proxy, custom domain or server-management commands are needed.
 
@@ -18,7 +24,8 @@ proxy, custom domain or server-management commands are needed.
 4. Keep the detected commands: build **`npm run build`**, deploy **`npm run deploy`**.
    The root directory is the repository root, not `cloudflare/`.
 5. Select **Deploy**. When it finishes, open the generated **`.workers.dev`** address.
-   The landing page gives you the exact service URL to copy into TRMNL.
+   If creating a separate fork, use that origin with the maintainer export command
+   below. The public recipe continues to use the author's shared origin.
 
 The root `wrangler.jsonc` declares the Worker, static artwork and D1 binding.
 No Cron Trigger is required. Cloudflare provisions D1; the application creates its initial tables
@@ -49,11 +56,29 @@ token settings to grant **D1 Edit** for this account, then retry the deployment.
 Do not post tokens in chat or commit them to Git. If the database exists but `DB`
 is unbound, use **Settings → Bindings** to bind that D1 database with the name **DB**.
 
-## Connect TRMNL
+## Package the recipe
 
-In the Private Plugin settings, set **Visibility service URL** to the new HTTPS
-origin with no trailing slash. Choose a mountain and its location. Turn on
-**Show feedback QR on full screen** if you want community reports.
+From the repository root, `.venv/bin/python tools/package_plugin.py` builds the
+public recipe ZIP at `releases/is-the-mountain-out.zip`, with the shared origin
+already configured. Commit the rebuilt ZIP when publishing recipe changes. Users only choose
+their mountain/viewpoint and optional feedback; there is no service URL field.
+
+For a separate fork or local backend development, export a separate ZIP:
+
+```sh
+.venv/bin/python tools/package_plugin.py --service-url https://YOUR-HOST --output .local/exports/fork.zip
+# Local-only development; this loopback ZIP is not for public installation:
+.venv/bin/python tools/package_plugin.py --service-url http://127.0.0.1:8787 --output .local/exports/local.zip
+```
+
+The maintainer override updates the polling origin and shared artwork origin
+together inside the ZIP, never a user-facing field or the source checkout.
+It validates HTTPS origins, with HTTP allowed for loopback development only.
+The origin is public configuration; do not put credentials in it.
+
+When upgrading an existing private plugin, import the new ZIP or replace settings
+and all templates, then remove the legacy `service_url` field. Old saved values
+are ignored by the new polling URL and markup.
 
 Use the current files in `plugin/src/` for the polling URL, custom fields, Shared
 template and each layout tab. The recipe is pinned to Framework 3.4.0.
@@ -66,6 +91,12 @@ Check the deployed site before relying on the device:
   UNKNOWN means the weather data is missing/stale, not that the mountain is hidden.
 - The QR feedback page names the correct mountain and viewpoint. Submit an actual
   observation, then confirm the receipt and subsequent display refresh.
+
+These are maintainer release checks. Weather cache entries and community reports
+are shared across every installation using this origin, grouped by mountain and
+viewpoint. Monitor Worker requests, D1 reads/writes and provider usage as adoption
+grows. Apply deployment-level rate limits to polling and feedback routes as
+appropriate; the form cookie is not an identity or a complete abuse-control system.
 
 The free Workers/D1 allowances are intended for this small pilot, but are not
 unlimited. Check Cloudflare's current limits and the usage shown in your account;

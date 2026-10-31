@@ -12,7 +12,7 @@ from tools.browser_support import install_assets, settle
 ROOT = Path(__file__).resolve().parents[1]
 DEVICES = [(None, 800, 480), ('v2', 1872, 1404), ('amazon_kindle_7', 800, 600),
            ('palma', 1648, 824), ('kobo_forma', 1920, 1440)]
-URL = 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev/f/0123456789abcdef01234567'
+URL = 'https://mountain.example.com/f/0123456789abcdef01234567'
 IMAGES = ['/assets/rainier-seattle.png', '/assets/rainier.png', '/assets/rainier-tacoma.png', '/assets/hood-portland.png']
 
 
