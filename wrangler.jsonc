@@ -8,8 +8,12 @@
   "vars": { "WEATHER_MODEL": "v2" },
   "previews": {
     "vars": { "WEATHER_MODEL": "v2" },
-    // Preview-owned storage; no production database name or ID.
-    "d1_databases": [{ "binding": "DB" }]
+    // Separate test storage shared by branch previews.
+    "d1_databases": [{
+      "binding": "DB",
+      "database_name": "mountain-feedback-preview",
+      "database_id": "5bc3f900-f60f-4803-baca-892f9af58451"
+    }]
   },
   "assets": {
     "directory": "assets",

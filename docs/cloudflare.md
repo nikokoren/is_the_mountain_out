@@ -48,8 +48,25 @@ Production builds must use deploy command **`npm run deploy`** (which runs
 `wrangler deploy`). **`npx wrangler preview`** publishes a separate Preview and
 does not update the public recipe origin. Non-production branch builds can use
 that preview command. The `previews` block explicitly sets `WEATHER_MODEL=v2`
-and declares a Preview-owned `DB` binding without the production database name or
-ID. Production reports and caches must not be bound into a Preview.
+and must bind `DB` to the ID of a separately created preview D1 database.
+`wrangler preview` does not automatically provision D1 from a binding name:
+omitting `database_id` passes local parsing but fails API validation with code
+10021. Production reports and caches must not be bound into a Preview.
+
+To set up preview storage once for this repository:
+
+1. In the same Cloudflare account, open **D1 → Create database** and create
+   **`mountain-feedback-preview`**. Keep the production `mountain-feedback`
+   database for the shared recipe.
+2. Copy the new database's **Database ID**. This identifier is configuration,
+   not an API token or password, and can be committed to the repository.
+3. Set `previews.d1_databases[0].database_id` in `wrangler.jsonc` to that ID.
+   Keep its binding name `DB` and leave the top-level production binding unchanged.
+4. Push the configuration to the review branch and check its Cloudflare Preview
+   deployment. The application initializes its own tables on the first API request.
+
+All branch previews using this configuration share that preview database;
+it is separate from production, rather than automatically created per preview.
 
 If a build fails with “missing a `previews` block,” verify whether it is a branch
 Preview or the production build before diagnosing the live deployment. A successful
@@ -104,15 +121,15 @@ Check the deployed site before relying on the device:
 - The landing page opens at your `.workers.dev` address.
 - `/health` returns `status: ok`, `storage: d1` and `weather_model: v2`.
 - `/api/visibility?mountain=rainier&viewpoint=seattle` returns a current result.
+  UNKNOWN means the weather data is missing/stale, not that the mountain is hidden.
 - `model_comparison.active_model` is `v2`, with both complete model predictions.
+- The QR feedback page names the correct mountain and viewpoint. Submit an actual
+  observation, then confirm the receipt and subsequent display refresh.
 
 V2 is a provisional default. Set `vars.WEATHER_MODEL` to `v1` in `wrangler.jsonc`
 and redeploy for rollback. An authenticated CLI deployment can override it with
 `npx wrangler deploy --var WEATHER_MODEL:v1`; a later ordinary deployment restores
 the repository setting. Model selection does not reset reports or weather data.
-  UNKNOWN means the weather data is missing/stale, not that the mountain is hidden.
-- The QR feedback page names the correct mountain and viewpoint. Submit an actual
-  observation, then confirm the receipt and subsequent display refresh.
 
 These are maintainer release checks. Weather cache entries and community reports
 are shared across every installation using this origin, grouped by mountain and
