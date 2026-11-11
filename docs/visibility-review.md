@@ -105,9 +105,17 @@ contains an OAuth authorization-code flow:
   uses the access token to fetch the account at `GET https://usetrmnl.com/api/me`.
 
 This establishes a concrete authentication pattern, not permission to reuse that
-app's registration, credentials or native-app callback. It also does not establish
-that the specific recipe the author saw uses this flow. A name/link for that
-recipe remains useful to verify its exact mechanism and reuse terms.
+app's registration, credentials or native-app callback.
+
+The author identified the example as [TRMNL Tug](https://trmnl-tug-markh.azurewebsites.net).
+The environment proxy rejects a connection to this host with CONNECT HTTP 403
+before reaching the application. Public GitHub searches did not locate its source.
+Its hostname was added to the existing saved network draft, preserving prior
+domains, but the running policy still has no custom host grants. The Tug sign-in
+destination, callback protocol and reuse terms remain unverified; do not assume
+that this particular app uses the official Companion app's OAuth flow. Inspection
+can resume after the network change is applied, or its sign-in destination/source
+can establish which mechanism it uses.
 
 The source app's decoded account type includes email/profile fields but does not
 establish a stable opaque account-ID field or OIDC subject. The integration needs
