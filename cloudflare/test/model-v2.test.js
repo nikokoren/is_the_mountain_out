@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {calculateV2,corridorV2} from '../src/model-v2.js';
-import {samples,viewpoints} from '../src/model.js';
+import {readFileSync} from 'node:fs';
+import {calculateV2,corridorV2,daylight} from '../src/model-v2.js';
+import {calculate,corridor,samples,viewpoints} from '../src/model.js';
 
 function normalize(value){
   if(Array.isArray(value))return value.map(normalize);
@@ -25,7 +26,7 @@ def payload(now,low=0,mid=0,high=0,visibility=24000,rain=0):
  'daily':{'sunrise':[(anchor+timedelta(days=d,hours=-5)).timestamp() for d in (-1,0,1)],
  'sunset':[(anchor+timedelta(days=d,hours=5)).timestamp() for d in (-1,0,1)]}}
 records=[]
-for low,mid,high,vis,rain,hours in itertools.product((0,40,100,None),(0,50,None),(0,100),(4999,24000,120000),(0,1),(0,5,6)):
+for low,mid,high,vis,rain,hours in itertools.product((0,40,100,None),(0,15,16,50,100,None),(0,100),(4999,9999,10000,18800,19999,20000,24000,120000),(0,1),(0,5,6)):
  now=anchor+timedelta(hours=hours)
  data=payload(now,low,mid,high,vis,rain)
  records.append({'payload':data,'now':now.timestamp(),'fetched':now.timestamp(),
@@ -61,5 +62,27 @@ print(json.dumps({'records':records,'routes':routes}))
     const location=viewpoints[key],points=samples(location);
     const actual=corridorV2(payloads.map(p=>calculateV2(p,now,now,location)),points,now,location);
     assert.deepEqual(normalize(actual),normalize(result));
+  }
+});
+
+test('Recorded Seattle mid-cloud false negative retains uncertainty without vetoing the view',()=>{
+  const fixture=JSON.parse(readFileSync('../tests/fixtures/seattle-2026-11-11-mid-cloud.json','utf8'));
+  const seconds=value=>Date.parse(value)/1000,now=seconds(fixture.checked_at),location=viewpoints.seattle;
+  const points=fixture.samples.map(s=>[s.latitude,s.longitude]);
+  const payloads=fixture.samples.map((sample,index)=>{
+    const hourly=Object.fromEntries(Object.entries(sample.weather_inputs).map(([key,value])=>[key,[value]]));
+    hourly.time=[seconds(fixture.forecast_at)];
+    return {hourly,...(index===0?{daily:{sunrise:[seconds(fixture.sunrise_at)],sunset:[seconds(fixture.sunset_at)]}}:{})};
+  });
+  const controls=payloads.map((p,i)=>calculate(p,now,seconds(fixture.samples[i].fetched_at),location));
+  const candidates=payloads.map((p,i)=>calculateV2(p,now,seconds(fixture.samples[i].fetched_at),location));
+  assert.equal(corridor(controls,points,now,location).status,fixture.status_before);
+  const result=corridorV2(candidates,points,now,location,daylight(payloads[0],now));
+  assert.equal(result.status,'mostly_out');
+  assert.equal(result.model,'seattle-corridor-v2.1-candidate');
+  assert.equal(result.haze_index,4.026);
+  assert.equal(result.observability.state,'daylight');
+  for(const sample of result.corridor_samples){
+    assert.equal(sample.status,'mostly_out');assert.deepEqual(sample.limiting_factors,['mid_cloud_cover']);
   }
 });

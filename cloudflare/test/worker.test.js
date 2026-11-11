@@ -73,7 +73,7 @@ test('V2 is the default weather estimate, retains v1 evidence and still yields t
     await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(weatherCandidate({cloud:100,high:100}))).run();
     const first=await context(request);
     assert.equal(first.display.status,'mountain_out');
-    assert.equal(first.display.model,'seattle-corridor-v2-candidate');
+    assert.equal(first.display.model,'seattle-corridor-v2.1-candidate');
     const comparison=first.display.model_comparison;
     assert.equal(comparison.active_model,'v2');
     assert.equal(comparison.v1.status,'not_out');
@@ -97,6 +97,33 @@ test('V2 is the default weather estimate, retains v1 evidence and still yields t
     data=await (await request('/api/visibility')).json();
     assert.equal(data.status,'unknown');assert.deepEqual(data.limiting_factors,['darkness']);
     assert.equal(data.weather_conditions.status,'mountain_out');
+  }finally{await mf.dispose();}
+});
+
+test('Mid-cloud overcast with moderate visibility no longer vetoes any viewpoint; poor conditions still do',async()=>{
+  const {mf,db,request}=await runtime(undefined,{WEATHER_MODEL:'v2'});
+  try{
+    const fixture=JSON.parse(readFileSync('../tests/fixtures/seattle-2026-11-11-mid-cloud.json','utf8'));
+    const inputs=fixture.samples[0].weather_inputs;
+    const base=weatherCandidate({cloud:inputs.cloud_cover,low:inputs.cloud_cover_low,mid:inputs.cloud_cover_mid,
+      high:inputs.cloud_cover_high,visibility:inputs.visibility});
+    base.hourly.weather_code=[inputs.weather_code];
+    for(const obstruction of [null,'low_cloud','rain','fog','poor_visibility']){
+      const payload=structuredClone(base);
+      if(obstruction==='low_cloud')payload.hourly.cloud_cover_low=[100];
+      if(obstruction==='rain')payload.hourly.precipitation=[2];
+      if(obstruction==='fog')payload.hourly.weather_code=[45];
+      if(obstruction==='poor_visibility')payload.hourly.visibility=[4999];
+      await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(payload)).run();
+      for(const location of Object.values(viewpoints)){
+        const data=await (await request(`/api/visibility?mountain=${location.mountain}&viewpoint=${location.id}`)).json();
+        assert.equal(data.status,obstruction?'not_out':'mostly_out',`${location.id}: ${obstruction??'mid cloud only'}`);
+        assert.equal(data.model_comparison.active_model,'v2');
+        assert.equal(data.model_comparison.v1.status,'not_out');
+        assert.match(data.model,/v2\.1-candidate$/);
+        assert.equal(data.report_count,0);
+      }
+    }
   }finally{await mf.dispose();}
 });
 

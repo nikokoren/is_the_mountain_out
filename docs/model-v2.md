@@ -1,14 +1,16 @@
-# Model v2: provisional default and submission-time evidence
+# Model v2.1: provisional default and submission-time evidence
 
-V2 is the experimental, uncalibrated default weather estimate. User-confirmed
-webcam sightings exposed false NOT OUT predictions in v1, supporting a reversible
-trial of v2 while testing continues. Those sightings do not establish v2's accuracy:
-the old deployed responses lack the cloud-layer and precipitation inputs needed
-to reconstruct its prediction. No thresholds were fitted to make those examples
-say OUT. V1 remains available in every response and as a rollback setting.
-Community-report overrides retain their existing 20-minute policy.
+V2.1 is the experimental, uncalibrated default weather estimate. A maintainer's
+webcam report and the corresponding Seattle API inputs exposed a false NOT OUT
+prediction in both v1 and the initial v2.0. V2.1 removes mid-cloud coverage as a
+hard obstruction and the 10–20 km surface-visibility cap. These are qualitative
+rule changes prompted by an observed failure, not evidence of validated accuracy.
+V1 remains available in every response and as a rollback setting. Community-report
+overrides retain their existing 20-minute policy.
 
-The Worker reads `WEATHER_MODEL`, configured as `v2` in `wrangler.jsonc`. Set it
+The Worker reads `WEATHER_MODEL`, configured as `v2` in `wrangler.jsonc`. The `v2`
+selection now runs revision 2.1, identified by `v2.1-candidate` in model IDs so
+evaluation does not silently pool its results with the initial v2. Set the variable
 to `v1` and redeploy to roll back without changing the algorithms, weather cache
 or stored reports. An authenticated maintainer can also use
 `npx wrangler deploy --var WEATHER_MODEL:v1`; the next ordinary deployment uses
@@ -23,12 +25,16 @@ and all three geographic corridors.
 
 ## Candidate rules
 
-- When both low and mid cloud layers are available, use their maximum as the
-  cloud-obstruction proxy. Retain total/high cloud as evidence but do not let
-  high cloud alone impose a NOT OUT cap. If either lower layer is missing, fall
-  back to total cover. Existing cloud thresholds remain qualitative hypotheses.
-- Retain v1's local visibility, precipitation, fog and severe-weather caps. High
-  cloud may be context, but actual local fog or rain still reduces the estimate.
+- When both low and mid cloud layers are available, use low-cloud coverage as
+  the obstruction proxy, with the existing qualitative cloud thresholds. Mid
+  coverage above the existing 15% clear-condition boundary caps the result at
+  MOSTLY OUT. It is uncertainty about an unmeasured cloud height, not proof that
+  the summit is hidden. Retain total/high cloud as diagnostics. If either lower
+  layer is missing, fall back to total cover as before.
+- Below 5 km surface visibility, retain NOT OUT; from 5 to below 10 km, retain
+  the KINDA OUT cap. At 10 km and above, do not apply a visibility-only cap.
+  Surface meteorological visibility is not a hard summit viewing-distance limit.
+  Retain precipitation, fog and severe-weather caps unchanged.
 - Retain the worst weather sample across the corridor. Compute and retain the
   same `haze_index` for comparison, but do not apply its extra distance/visibility
   cap to v2.
@@ -39,8 +45,28 @@ and all three geographic corridors.
 Cloud-layer percentages do not provide cloud-base heights or a measured sight
 line. V2 does not invent those heights, infer exact visible fractions or claim
 that high clouds can never matter. Terrain, elevated rays, illumination, moonlight
-and webcams remain outside this candidate's scope. The low/mid rule needs the
+and webcams remain outside this candidate's scope. The revised cloud rule needs the
 same observation-based evaluation as the removed distance cap.
+
+## Diagnosed Seattle false negative
+
+At `2026-11-11T22:35:45.743Z`, the live response confirmed v2 was active, weather
+was the display basis, and no community votes were present. Across the four
+samples, low cloud was 0%, mid cloud was 100/100/100/42%, high cloud was 100%,
+visibility was 18,800/20,200/30,500/33,500 m, precipitation was zero, and WMO code
+was 3 (overcast, not fog). Daylight was valid. All forecasts selected 23:00 UTC.
+The original `max(low, mid)` rule forced NOT OUT in the first three samples;
+the fourth was HALFWAY OUT. The worst-sample aggregation therefore returned NOT OUT.
+Switching back to v1 would retain the failure.
+
+The [recorded input fixture](../tests/fixtures/seattle-2026-11-11-mid-cloud.json)
+retains the selected inputs and solar interval, not an invented provider response.
+Replaying it gives NOT OUT under the original v2.0 and MOSTLY OUT under v2.1,
+with `mid_cloud_cover` as each sample's limiting factor. The uncertainty cap avoids
+claiming a confirmed clear view. A maintainer reported the mountain visible on
+webcams; exact camera identity and frame time were not supplied. This case is a
+regression example used to develop the change, not held-out validation. Other
+viewpoints were reported wrong too, but their live inputs were not provided.
 
 ## Daylight handling
 
@@ -76,10 +102,9 @@ without daily data are refreshed on the first request. Both models share those
 new entries with the usual 15-minute policy. Old entries expire through normal
 cleanup. Reports, QR contexts and the database schema are preserved.
 
-The existing local visibility cap remains a known limitation: with the user's
-reported Seattle visibility of 19,600 m, even clear, dry v2 weather is capped at
-HALFWAY OUT. Switching models alone does not resolve that mismatch. Review the
-new raw inputs against timestamped webcams before changing that rule.
+The 5 km and 10 km poor-visibility thresholds and low-cloud proxy remain
+uncalibrated. Removing the 20 km cap does not establish that haze, low cloud or
+mid cloud cannot hide a summit. Review further cases against timestamped webcams.
 
 ## API fields
 
@@ -95,7 +120,7 @@ results, including timestamps, inputs and location metadata, are retained:
       "status": "kinda_out"
     },
     "v2": {
-      "model": "seattle-corridor-v2-candidate",
+      "model": "seattle-corridor-v2.1-candidate",
       "status": "mountain_out",
       "observability": {"state": "daylight"},
       "weather_conditions": {"status": "mountain_out"}
@@ -112,7 +137,7 @@ the weather model; `display_basis` still identifies a community override.
 
 Candidate cloud diagnostics use `weather_inputs.effective_cloud_cover` for the
 candidate's own input rule. Local candidates expose `cloud_basis` as
-`low_mid_layers` or `total_cloud_fallback`. Corridor inputs remain attached to
+`low_layer_with_mid_uncertainty` or `total_cloud_fallback`. Corridor inputs remain attached to
 individual samples. V1 evidence is kept separately and is not mutated by v2.
 
 ## Reports: original versus submission-time forecasts
@@ -178,9 +203,10 @@ provisional v2 default is an operational choice, not a claim of validation.
 
 ## Current checks
 
-The implementation is covered by 65 Python tests and 12 Worker/Node tests,
+The implementation is covered by 66 Python tests and 14 Worker/Node tests,
 including the Worker build dry run, full Python/JavaScript candidate parity,
-provider-query/caching checks, default selection and rollback, solar boundaries, stale and missing samples,
+provider-query/caching checks, the recorded Seattle regression, default selection
+and rollback, solar boundaries, stale and missing samples,
 submission snapshots, replay immutability and evaluation-tool accounting.
 The mobile feedback flow is also exercised with Chromium and fixture weather.
 These checks establish implementation behavior, not measured improvement in

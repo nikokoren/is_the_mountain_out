@@ -40,20 +40,25 @@ function gate(weather,observability,now){
 
 export function calculateV2(payload,now,fetched,location,baseline){
   baseline??=calculate(payload,now,fetched,location);
-  const result={...baseline,model:'local-weather-v2-candidate'};
+  const result={...baseline,model:'local-weather-v2.1-candidate'};
   if(baseline.weather_inputs){
     const inputs={...baseline.weather_inputs};
     const hasLayers=inputs.cloud_cover_low!=null&&inputs.cloud_cover_mid!=null;
-    const cloud=hasLayers?Math.max(inputs.cloud_cover_low,inputs.cloud_cover_mid):inputs.cloud_cover;
+    // Sky coverage is not sight-line obstruction. Mid cloud may sit above the
+    // summit; keep it as uncertainty rather than letting it veto a view.
+    const cloud=hasLayers?inputs.cloud_cover_low:inputs.cloud_cover;
     inputs.effective_cloud_cover=cloud;
-    result.weather_inputs=inputs;result.cloud_basis=hasLayers?'low_mid_layers':'total_cloud_fallback';
+    result.weather_inputs=inputs;result.cloud_basis=hasLayers?'low_layer_with_mid_uncertainty':'total_cloud_fallback';
     const limits={cloud_cover:cloud<=15?4:cloud<=35?3:cloud<=60?2:cloud<=85?1:0,
-      visibility:inputs.visibility<5000?0:inputs.visibility<10000?1:inputs.visibility<20000?2:4,
+      mid_cloud_cover:hasLayers&&inputs.cloud_cover_mid>15?3:4,
+      // Surface visibility is not a maximum viewing distance for a summit.
+      // Retain poor-visibility/fog checks; remove the 10–20 km partial-view cap.
+      visibility:inputs.visibility<5000?0:inputs.visibility<10000?1:4,
       precipitation:inputs.precipitation>=1?0:inputs.precipitation>0?1:4,
       weather_code:[45,48,65,67,75,82,86,95,96,99].includes(inputs.weather_code)?0:inputs.weather_code>=51?1:4};
     const level=Math.min(...Object.values(limits));
     Object.assign(result,{status:states[level],verdict:labels[level],
-      explanation:'Layer-aware weather candidate; cloud heights and the actual sight line are unverified.',
+      explanation:'Low-cloud weather estimate with mid-cloud uncertainty; cloud heights and the sight line are unverified.',
       limiting_factors:Object.keys(limits).filter(key=>limits[key]===level&&level<4)});
   }
   return gate(result,daylight(payload,now),now);
@@ -63,11 +68,11 @@ export function corridorV2(results,points,now,location,observability){
   const weather=results.map(r=>({...r,...r.weather_conditions}));
   const result=corridor(weather,points,now,location);
   delete result.weather_conditions;delete result.observability;delete result.cloud_basis;
-  result.model=location.id+'-corridor-v2-candidate';
+  result.model=location.id+'-corridor-v2.1-candidate';
   if(result.status!=='unknown'){
     const level=Math.min(...weather.map(r=>states.indexOf(r.status)));
     Object.assign(result,{status:states[level],verdict:labels[level],
-      explanation:'Layer-aware corridor candidate without a distance/visibility cap; not a confirmed view.',
+      explanation:'Low-cloud corridor estimate with mid-cloud uncertainty; not a confirmed view.',
       limiting_factors:level<4?['corridor_weather']:[]});
   }
   return gate(result,observability??results[0]?.observability??{state:'unknown'},now);

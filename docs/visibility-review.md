@@ -11,6 +11,9 @@ Implementation follow-up: [experimental model v2 is now the provisional default]
 new reports retain submission-time forecasts for both versions alongside their
 original QR-linked weather estimate. V1 is retained for comparison and rollback;
 the provisional switch after user-confirmed webcam mismatches is not validation.
+Revision 2.1 additionally addresses the diagnosed mid-cloud false negative and
+moderate surface-visibility penalty. The findings below describe the original
+v1 review; the linked model guide describes the current rules.
 
 ## How the verdict is inferred
 
@@ -206,8 +209,7 @@ Needed from provider: supported client registration/type, issuer/discovery URL a
 ```
 
 Login is not implemented or enabled by this review. Anonymous submission policy
-and weather thresholds remain as before; the completed code change adds evidence
-needed to evaluate the next model and feedback-policy changes.
+remains in place; subsequent weather-rule changes are documented in the model guide.
 
 ## Validation of the prepared change
 

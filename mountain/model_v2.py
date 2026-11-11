@@ -70,25 +70,29 @@ def _gate(weather, observability, now):
 def calculate_v2(payload, now, fetched_at, location, baseline=None):
     baseline = calculate(payload, now, fetched_at, location) if baseline is None else baseline
     result = dict(baseline)
-    result['model'] = 'local-weather-v2-candidate'
+    result['model'] = 'local-weather-v2.1-candidate'
     inputs = baseline.get('weather_inputs')
     if inputs is not None:
         inputs = dict(inputs)
         layers_available = inputs.get('cloud_cover_low') is not None and inputs.get('cloud_cover_mid') is not None
-        cloud = max(inputs['cloud_cover_low'], inputs['cloud_cover_mid']) if layers_available else inputs['cloud_cover']
+        # Sky coverage is not sight-line obstruction. Mid cloud may sit above
+        # the summit; retain uncertainty without treating it as a veto.
+        cloud = inputs['cloud_cover_low'] if layers_available else inputs['cloud_cover']
         inputs['effective_cloud_cover'] = cloud
         result['weather_inputs'] = inputs
-        result['cloud_basis'] = 'low_mid_layers' if layers_available else 'total_cloud_fallback'
+        result['cloud_basis'] = 'low_layer_with_mid_uncertainty' if layers_available else 'total_cloud_fallback'
         limits = dict(
             cloud_cover=4 if cloud <= 15 else 3 if cloud <= 35 else 2 if cloud <= 60 else 1 if cloud <= 85 else 0,
-            visibility=0 if inputs['visibility'] < 5000 else 1 if inputs['visibility'] < 10000 else 2 if inputs['visibility'] < 20000 else 4,
+            mid_cloud_cover=3 if layers_available and inputs['cloud_cover_mid'] > 15 else 4,
+            # Surface visibility is not a maximum viewing distance for a summit.
+            visibility=0 if inputs['visibility'] < 5000 else 1 if inputs['visibility'] < 10000 else 4,
             precipitation=0 if inputs['precipitation'] >= 1 else 1 if inputs['precipitation'] > 0 else 4,
             weather_code=0 if inputs['weather_code'] in {45, 48, 65, 67, 75, 82, 86, 95, 96, 99}
                          else 1 if inputs['weather_code'] >= 51 else 4,
         )
         level = min(limits.values())
         result.update(status=STATES[level], verdict=LABELS[level].upper(),
-                      explanation='Layer-aware weather candidate; cloud heights and the actual sight line are unverified.',
+                      explanation='Low-cloud weather estimate with mid-cloud uncertainty; cloud heights and the sight line are unverified.',
                       limiting_factors=[key for key, cap in limits.items() if cap == level and level < 4])
     return _gate(result, daylight(payload, now), now)
 
@@ -101,11 +105,11 @@ def corridor_v2(results, points, now, location, observability=None):
     result.pop('weather_conditions', None)
     result.pop('observability', None)
     result.pop('cloud_basis', None)
-    result['model'] = location['id'] + '-corridor-v2-candidate'
+    result['model'] = location['id'] + '-corridor-v2.1-candidate'
     if result['status'] != 'unknown':
         level = min(STATES.index(sample['status']) for sample in weather)
         result.update(status=STATES[level], verdict=LABELS[level].upper(),
-                      explanation='Layer-aware corridor candidate without a distance/visibility cap; not a confirmed view.',
+                      explanation='Low-cloud corridor estimate with mid-cloud uncertainty; not a confirmed view.',
                       limiting_factors=['corridor_weather'] if level < 4 else [])
     return _gate(result, observability if observability is not None else
                  results[0]['observability'] if results else dict(state='unknown'), now)

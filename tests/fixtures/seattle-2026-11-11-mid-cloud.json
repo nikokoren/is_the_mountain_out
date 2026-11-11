@@ -1,0 +1,37 @@
+{
+  "description": "Selected inputs from the maintainer-supplied public Seattle API response. This is normalized evidence, not the complete Open-Meteo response.",
+  "checked_at": "2026-11-11T22:35:45.743Z",
+  "forecast_at": "2026-11-11T23:00:00.000Z",
+  "sunrise_at": "2026-11-11T15:09:07.000Z",
+  "sunset_at": "2026-11-12T00:37:17.000Z",
+  "model_before": "seattle-corridor-v2-candidate",
+  "status_before": "not_out",
+  "reported_observation": "mountain_out",
+  "observation_source": "Maintainer-reported webcam sighting; camera identity and exact frame timestamp were not supplied. Not a saved community vote or independent validation.",
+  "samples": [
+    {
+      "latitude": 47.6295,
+      "longitude": -122.3599,
+      "fetched_at": "2026-11-11T22:28:08.711Z",
+      "weather_inputs": {"cloud_cover": 100, "cloud_cover_low": 0, "cloud_cover_mid": 100, "cloud_cover_high": 100, "visibility": 18800, "precipitation": 0, "weather_code": 3}
+    },
+    {
+      "latitude": 47.37043333333333,
+      "longitude": -122.16003333333333,
+      "fetched_at": "2026-11-11T22:28:08.940Z",
+      "weather_inputs": {"cloud_cover": 100, "cloud_cover_low": 0, "cloud_cover_mid": 100, "cloud_cover_high": 100, "visibility": 20200, "precipitation": 0, "weather_code": 3}
+    },
+    {
+      "latitude": 47.11136666666667,
+      "longitude": -121.96016666666667,
+      "fetched_at": "2026-11-11T22:28:08.707Z",
+      "weather_inputs": {"cloud_cover": 100, "cloud_cover_low": 0, "cloud_cover_mid": 100, "cloud_cover_high": 100, "visibility": 30500, "precipitation": 0, "weather_code": 3}
+    },
+    {
+      "latitude": 46.8523,
+      "longitude": -121.7603,
+      "fetched_at": "2026-11-11T22:28:08.707Z",
+      "weather_inputs": {"cloud_cover": 100, "cloud_cover_low": 0, "cloud_cover_mid": 42, "cloud_cover_high": 100, "visibility": 33500, "precipitation": 0, "weather_code": 3}
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import json
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import MagicMock, patch
 from mountain.model import calculate, calculate_corridor
@@ -30,7 +31,7 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(result['status'], 'mountain_out')
         self.assertEqual(result['weather_inputs']['effective_cloud_cover'], 0)
         self.assertEqual(result['weather_inputs']['cloud_cover_high'], 100)
-        self.assertEqual(result['cloud_basis'], 'low_mid_layers')
+        self.assertEqual(result['cloud_basis'], 'low_layer_with_mid_uncertainty')
 
     def test_missing_layers_fall_back_and_invalid_data_stays_unknown(self):
         for missing in ('cloud_cover_low', 'cloud_cover_mid'):
@@ -43,8 +44,10 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(calculate_v2(payload, NOW, NOW, PARADISE)['status'], 'unknown')
 
     def test_local_obstruction_limits_are_retained(self):
-        for fields, status in [(dict(low=100), 'not_out'), (dict(mid=50), 'halfway_out'),
-                               (dict(visibility=4999), 'not_out'), (dict(visibility=10000), 'halfway_out'),
+        for fields, status in [(dict(low=100), 'not_out'), (dict(mid=15), 'mountain_out'),
+                               (dict(mid=16), 'mostly_out'), (dict(mid=100), 'mostly_out'),
+                               (dict(visibility=4999), 'not_out'), (dict(visibility=9999), 'kinda_out'),
+                               (dict(visibility=10000), 'mountain_out'), (dict(visibility=18800), 'mountain_out'),
                                (dict(precipitation=.1), 'kinda_out'), (dict(precipitation=1), 'not_out'),
                                (dict(code=45), 'not_out')]:
             with self.subTest(fields=fields):
@@ -157,9 +160,35 @@ class CandidateTests(unittest.TestCase):
         service.active_model = 'v1'
         self.assertEqual(service.result(SEATTLE)['status'], 'not_out')
         self.assertEqual(len(calls), 4)
-        capped = WeatherService(lambda *_: candidate_weather(visibility=19600), lambda: NOW,
-                                active_model='v2').result(SEATTLE)
-        self.assertEqual(capped['status'], 'halfway_out')
+        moderate_visibility = WeatherService(lambda *_: candidate_weather(visibility=19600), lambda: NOW,
+                                             active_model='v2').result(SEATTLE)
+        self.assertEqual(moderate_visibility['status'], 'mountain_out')
         with self.assertRaises(ValueError):
             WeatherService(active_model='invalid')
         json.dumps(result, allow_nan=False)
+
+    def test_recorded_mid_cloud_false_negative_keeps_uncertainty_without_vetoing_the_view(self):
+        fixture = json.loads((Path(__file__).parent / 'fixtures/seattle-2026-11-11-mid-cloud.json').read_text())
+        timestamp = datetime.fromisoformat
+        now = timestamp(fixture['checked_at'])
+        points = [(sample['latitude'], sample['longitude']) for sample in fixture['samples']]
+        control, candidate = [], []
+        observer_daylight = None
+        for index, sample in enumerate(fixture['samples']):
+            payload = {'hourly': {key: [value] for key, value in sample['weather_inputs'].items()}}
+            payload['hourly']['time'] = [timestamp(fixture['forecast_at']).timestamp()]
+            if index == 0:
+                payload['daily'] = dict(sunrise=[timestamp(fixture['sunrise_at']).timestamp()],
+                                        sunset=[timestamp(fixture['sunset_at']).timestamp()])
+                observer_daylight = daylight(payload, now)
+            fetched = timestamp(sample['fetched_at'])
+            control.append(calculate(payload, now, fetched, SEATTLE))
+            candidate.append(calculate_v2(payload, now, fetched, SEATTLE))
+        self.assertEqual(calculate_corridor(control, points, now, SEATTLE)['status'], fixture['status_before'])
+        result = corridor_v2(candidate, points, now, SEATTLE, observer_daylight)
+        self.assertEqual(result['status'], 'mostly_out')
+        self.assertEqual(result['model'], 'seattle-corridor-v2.1-candidate')
+        self.assertEqual(result['observability']['state'], 'daylight')
+        self.assertEqual(result['haze_index'], 4.026)
+        self.assertTrue(all(sample['status'] == 'mostly_out' for sample in result['corridor_samples']))
+        self.assertTrue(all(sample['limiting_factors'] == ['mid_cloud_cover'] for sample in result['corridor_samples']))

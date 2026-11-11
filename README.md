@@ -12,10 +12,10 @@ Seattle, Tacoma and Portland use four weather samples toward the summit;
 Paradise uses one local sample. Seattle's corridor is approximately 98 km long.
 The preset selects both weather geometry and viewpoint-specific generated artwork.
 
-The experimental [v2 model](docs/model-v2.md) is the default weather estimate.
-It evaluates low/mid clouds separately from high cloud, keeps the distance/visibility
-haze index as a diagnostic, and makes nighttime or missing daylight data UNKNOWN.
-It retains local visibility, rain and fog limits. V1 runs alongside it for comparison
+The experimental [v2.1 model](docs/model-v2.md) is the default weather estimate.
+It uses low cloud as an obstruction proxy, treats mid cloud as uncertainty, keeps
+the distance/visibility haze index as a diagnostic, and makes nighttime or missing
+daylight data UNKNOWN. It retains poor-visibility, rain and fog limits. V1 runs alongside it for comparison
 and rollback. User-confirmed webcam sightings exposed false NOT OUT verdicts in v1;
 this provisional switch does not establish v2's accuracy. Neither model verifies
 webcams, terrain or cloud heights. Community reports still follow the existing
@@ -114,7 +114,7 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 65 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 66 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
