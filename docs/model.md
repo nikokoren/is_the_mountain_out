@@ -1,5 +1,9 @@
 # Weather model and normalized result
 
+The rules below describe the active v1 weather estimate. A separate
+[v2 candidate](model-v2.md) is evaluated in shadow mode from the same input data;
+it does not replace the displayed forecast during calibration.
+
 These thresholds are qualitative heuristics, **not calibrated probabilities**.
 Forecasts near the observer cannot establish what is happening along the entire
 viewing path or on the summit. No community website status is used.
@@ -9,6 +13,8 @@ viewing path or on the summit. No community website status is used.
 Open-Meteo `/v1/forecast` receives observer latitude/longitude, `timezone=UTC`,
 `timeformat=unixtime`, `forecast_days=2` and hourly cloud cover (total, low, mid,
 high), visibility (metres), precipitation (mm), and WMO weather code.
+The shared fetch also requests daily `sunrise,sunset` and one past day for the v2
+daylight check. Both models use the same response and cache entries.
 UTC epoch timestamps avoid DST ambiguity. The closest forecast hour is selected;
 ties choose the first hour in the response. A forecast hour more than 90 minutes
 away in either direction, a response older than 60 minutes, or a future retrieval

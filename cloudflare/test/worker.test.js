@@ -4,12 +4,12 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {samples,viewpoints} from '../src/model.js';
 
-async function runtime(){
+async function runtime(outbound){
   const modules=[{type:'ESModule',path:'dist/worker.js'},...readdirSync('dist').filter(s=>s.endsWith('.sql')).map(s=>({type:'Text',path:'dist/'+s}))];
   let upstream=0;
   const mf=new Miniflare(await convertV4MiniflareOptions({modules,compatibilityDate:'2026-10-01',d1Databases:['DB'],
     serviceBindings:{ASSETS:async request=>new Response(readFileSync('../assets'+new URL(request.url).pathname),{headers:{'Content-Type':'image/png'}})},
-    outboundService:async()=>{upstream++;throw Error('No network in integration test');}}));
+    outboundService:async request=>{upstream++;if(outbound)return outbound(request);throw Error('No network in integration test');}}));
   const request=(path,options={})=>mf.dispatchFetch('https://mountain.test'+path,options);
   assert.equal((await request('/health')).status,200);
   const db=await mf.getD1Database('DB');
@@ -32,6 +32,81 @@ async function context(request,viewpoint='seattle',browserCookie){
 async function vote(request,form,answer,extraHeaders={}){
   return request('/feedback',{method:'POST',headers:{Cookie:form.cookie,'Content-Type':'application/x-www-form-urlencoded',...extraHeaders},body:new URLSearchParams({token:form.token,csrf:form.csrf,answer,present:'yes'})});
 }
+
+function weatherCandidate(options={}){
+  const {cloud=0,low=0,mid=0,high=0,visibility=24000,rain=0}=options,t=Date.now()/1000;
+  return {hourly:{time:[t],cloud_cover:[cloud],cloud_cover_low:[low],cloud_cover_mid:[mid],cloud_cover_high:[high],
+    visibility:[visibility],precipitation:[rain],weather_code:[0]},
+    daily:{sunrise:[-1,0,1].map(d=>t-18000+d*86400),sunset:[-1,0,1].map(d=>t+18000+d*86400)}};
+}
+
+test('Both weather models share fetched inputs and request bracketed sunrise/sunset data',async()=>{
+  const urls=[];
+  const {mf,db,request,upstream}=await runtime(request=>{
+    urls.push(new URL(request.url));return new Response(JSON.stringify(weatherCandidate()));
+  });
+  try{
+    await db.prepare('DELETE FROM weather_cache').run();
+    const data=await (await request('/api/visibility')).json();
+    assert.equal(data.status,'kinda_out');
+    assert.equal(data.model_comparison.active_model,'v1');
+    assert.equal(data.model_comparison.v1.status,'kinda_out');
+    assert.equal(data.model_comparison.v2.status,'mountain_out');
+    assert.equal(data.model_comparison.v2.observability.state,'daylight');
+    assert.equal(data.model_comparison.agrees,false);
+    assert.equal(upstream(),4);
+    for(const url of urls){
+      assert.equal(url.searchParams.get('daily'),'sunrise,sunset');
+      assert.equal(url.searchParams.get('past_days'),'1');
+      assert.equal(url.searchParams.get('timezone'),'UTC');
+      assert.equal(url.searchParams.get('timeformat'),'unixtime');
+    }
+    await request('/api/visibility');assert.equal(upstream(),4);
+  }finally{await mf.dispose();}
+});
+
+test('Submission evaluates both models now, preserves QR evidence and keeps retries immutable',async()=>{
+  const {mf,db,request}=await runtime();
+  try{
+    const first=await context(request);
+    await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(weatherCandidate({rain:2}))).run();
+    const response=await vote(request,first,'not_out');
+    assert.equal(response.status,200);
+    const receipt=await response.text();assert.match(receipt,/agrees with/);assert.match(receipt,/at submission/);
+    const original=await db.prepare('SELECT received,snapshot FROM reports WHERE context_token=?').bind(first.token).first();
+    const snapshot=JSON.parse(original.snapshot);
+    assert.equal(snapshot.status,'mountain_out');
+    assert.equal(snapshot.submission_weather_estimate.status,'not_out');
+    assert.equal(snapshot.submission_weather_estimate.model_comparison.v2.status,'not_out');
+    assert.deepEqual(snapshot.corridor_samples,first.display.corridor_samples);
+    const qr=await db.prepare('SELECT snapshot FROM contexts WHERE token=?').bind(first.token).first();
+    assert.equal(JSON.parse(qr.snapshot).submission_weather_estimate,undefined);
+    await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(weatherCandidate())).run();
+    await vote(request,first,'not_out');
+    const replay=await db.prepare('SELECT received,snapshot FROM reports WHERE context_token=?').bind(first.token).first();
+    assert.deepEqual(replay,original);
+    await vote(request,first,'out');
+    const updated=JSON.parse((await db.prepare('SELECT snapshot FROM reports WHERE context_token=?').bind(first.token).first()).snapshot);
+    assert.equal(updated.status,'mountain_out');
+    assert.equal(updated.submission_weather_estimate.status,'kinda_out');
+    assert.equal(updated.submission_weather_estimate.model_comparison.v2.status,'mountain_out');
+  }finally{await mf.dispose();}
+});
+
+test('Weather failure during submission saves the observation with unknown current estimates',async()=>{
+  const {mf,db,request}=await runtime();
+  try{
+    const first=await context(request);
+    await db.prepare('DELETE FROM weather_cache').run();
+    const response=await vote(request,first,'out');
+    assert.equal(response.status,200);
+    assert.match(await response.text(),/without an agreement/);
+    const snapshot=JSON.parse((await db.prepare('SELECT snapshot FROM reports WHERE context_token=?').bind(first.token).first()).snapshot);
+    assert.equal(snapshot.status,'mountain_out');
+    assert.equal(snapshot.submission_weather_estimate.status,'unknown');
+    assert.equal(snapshot.submission_weather_estimate.model_comparison.v2.status,'unknown');
+  }finally{await mf.dispose();}
+});
 
 test('Worker serves assets, initializes D1 and uses persistent weather cache for all four views',async()=>{
   const {mf,request,upstream}=await runtime();

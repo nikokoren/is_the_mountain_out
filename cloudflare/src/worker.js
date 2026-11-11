@@ -1,6 +1,7 @@
 import qrcode from 'qrcode-generator';
 import schema from '../migrations/0001.sql';
 import {calculate,corridor,samples,locationFrom,iso,unknown,states,labels} from './model.js';
+import {calculateV2,corridorV2,compareModels,daylight} from './model-v2.js';
 import {page,home,form,receipt,choices,escape} from './pages.js';
 
 const encoder=new TextEncoder();
@@ -38,7 +39,7 @@ async function weatherSample(env,location,point){
     payload=cached.payload?JSON.parse(cached.payload):null;fetched=cached.fetched;
   }else{
     const url=new URL('https://api.open-meteo.com/v1/forecast');
-    url.search=new URLSearchParams({latitude:point[0],longitude:point[1],hourly:'cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,weather_code',timezone:'UTC',timeformat:'unixtime',forecast_days:'2'});
+    url.search=new URLSearchParams({latitude:point[0],longitude:point[1],hourly:'cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,precipitation,weather_code',daily:'sunrise,sunset',past_days:'1',timezone:'UTC',timeformat:'unixtime',forecast_days:'2'});
     try{
       const response=await fetch(url,{signal:AbortSignal.timeout(10000)});
       if(!response.ok)throw Error('Weather unavailable');
@@ -47,13 +48,16 @@ async function weatherSample(env,location,point){
     fetched=now();
     await env.DB.prepare('INSERT INTO weather_cache(key,fetched,payload) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET fetched=excluded.fetched,payload=excluded.payload').bind(key,fetched,payload===null?null:JSON.stringify(payload)).run();
   }
-  return payload===null?unknown('Weather provider unavailable. No current estimate.',now(),location):calculate(payload,now(),fetched,location);
+  const evaluatedAt=now();
+  const v1=payload===null?unknown('Weather provider unavailable. No current estimate.',evaluatedAt,location):calculate(payload,evaluatedAt,fetched,location);
+  return {v1,v2:calculateV2(payload,evaluatedAt,fetched,location,v1),payload};
 }
 async function estimate(env,location){
-  const points=samples(location),results=await Promise.all(points.map(p=>weatherSample(env,location,p)));
-  const result=points.length===1?{...results[0],model:'local-weather-v1-uncalibrated'}:corridor(results,points,now(),location);
-  Object.assign(result,{mountain:location.mountain,viewpoint:location.id,image_path:location.image_path});
-  return result;
+  const points=samples(location),pairs=await Promise.all(points.map(p=>weatherSample(env,location,p))),evaluatedAt=now();
+  const result=points.length===1?{...pairs[0].v1,model:'local-weather-v1-uncalibrated'}:corridor(pairs.map(p=>p.v1),points,evaluatedAt,location);
+  const candidate=points.length===1?pairs[0].v2:corridorV2(pairs.map(p=>p.v2),points,evaluatedAt,location,daylight(pairs[0].payload,evaluatedAt));
+  for(const model of [result,candidate])Object.assign(model,{mountain:location.mountain,viewpoint:location.id,image_path:location.image_path});
+  return compareModels(result,candidate);
 }
 
 export async function activeReports(db,mountain,viewpoint,time=now()){
@@ -162,13 +166,22 @@ async function route(request,env){
     if(!browser||!equal(await digest(env,'csrf:'+token+':'+browser),fields.get('csrf')))return html('Report not saved','<h1>Open the feedback form again</h1>',400);
     const answer=fields.get('answer');
     if(!Object.hasOwn(choices,answer)||fields.get('present')!=='yes')return html('Report not saved','<h1>Choose an answer and confirm you are looking now.</h1>',400);
-    const browserHash=await digest(env,'browser:'+browser),old=await env.DB.prepare('SELECT answer FROM reports WHERE context_token=? AND browser_hash=?').bind(token,browserHash).first();
+    const browserHash=await digest(env,'browser:'+browser),old=await env.DB.prepare('SELECT answer,snapshot FROM reports WHERE context_token=? AND browser_hash=?').bind(token,browserHash).first();
+    let reportSnapshot=old?JSON.parse(old.snapshot):null;
     // Identical retries do not extend a vote. A changed answer replaces it;
     // independently issued QR contexts preserve separate historical reports.
-    if(!old||old.answer!==answer)await env.DB.prepare(`INSERT INTO reports(received,mountain,viewpoint,answer,browser_hash,context_token,snapshot) VALUES (?,?,?,?,?,?,?)
-      ON CONFLICT(context_token,browser_hash) DO UPDATE SET received=excluded.received,answer=excluded.answer,snapshot=excluded.snapshot`).bind(now(),snapshot.mountain,snapshot.viewpoint,answer,browserHash,token,JSON.stringify(snapshot.weather_estimate??snapshot)).run();
+    if(!old||old.answer!==answer){
+      const received=now(),location=locationFrom(new URLSearchParams({mountain:snapshot.mountain,viewpoint:snapshot.viewpoint}));
+      const submissionWeather=await estimate(env,location);
+      reportSnapshot={...(snapshot.weather_estimate??snapshot),submission_weather_estimate:submissionWeather};
+      await env.DB.prepare(`INSERT INTO reports(received,mountain,viewpoint,answer,browser_hash,context_token,snapshot) VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(context_token,browser_hash) DO UPDATE SET received=excluded.received,answer=excluded.answer,snapshot=excluded.snapshot
+        WHERE reports.answer<>excluded.answer`).bind(received,snapshot.mountain,snapshot.viewpoint,answer,browserHash,token,JSON.stringify(reportSnapshot)).run();
+      const saved=await env.DB.prepare('SELECT snapshot FROM reports WHERE context_token=? AND browser_hash=?').bind(token,browserHash).first();
+      reportSnapshot=JSON.parse(saved.snapshot);
+    }
     const reports=await activeReports(env.DB,snapshot.mountain,snapshot.viewpoint);
-    return output(receipt(snapshot,answer,countReports(reports)),200,'text/html; charset=utf-8');
+    return output(receipt(reportSnapshot,answer,countReports(reports)),200,'text/html; charset=utf-8');
   }
   return output({error:'Not found'},404);
 }

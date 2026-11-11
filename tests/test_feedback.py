@@ -14,6 +14,8 @@ from mountain.provider import WeatherService
 from mountain.server import handler
 from mountain.viewpoints import SEATTLE
 from test_mountain import NOW, weather
+from test_model_v2 import candidate_weather
+from datetime import datetime, timezone
 
 
 class StoreTests(unittest.TestCase):
@@ -86,6 +88,48 @@ class StoreTests(unittest.TestCase):
         self.store.prune()
         self.assertEqual(list(self.store.export()), [])
 
+    def test_submission_estimate_is_current_and_original_evidence_is_preserved(self):
+        token = self.store.issue(self.snapshot)
+        self.now[0] += 3600
+        current = datetime.fromtimestamp(self.now[0], timezone.utc)
+        service = WeatherService(lambda *_: candidate_weather(current, precipitation=2), lambda: current)
+        browser = 'e' * 32
+        self.assertTrue(self.store.submit(token, browser, self.store.csrf(token, browser), 'out', 'yes',
+                                         estimator=lambda _: service.result(SEATTLE)))
+        report = list(self.store.export())[0]
+        self.assertEqual(report['snapshot']['status'], 'mountain_out')
+        fresh = report['snapshot']['submission_weather_estimate']
+        self.assertEqual(fresh['status'], 'not_out')
+        self.assertEqual(fresh['model_comparison']['v2']['status'], 'not_out')
+        self.assertEqual(report['comparison_basis'], 'submission')
+        self.assertEqual(report['comparisons'], {'v1': 'different', 'v2': 'different'})
+        self.assertEqual(len(list(self.store.review())), 1)
+        self.assertNotIn('submission_weather_estimate', self.store.context(token))
+
+    def test_invalid_and_duplicate_reports_do_not_evaluate_weather(self):
+        token = self.store.issue(self.snapshot)
+        browser, calls = 'f' * 32, []
+        def estimator(_):
+            calls.append(1)
+            return self.snapshot
+        with self.assertRaises(ValueError):
+            self.store.submit(token, browser, 'invalid', 'out', 'yes', estimator)
+        self.assertEqual(calls, [])
+        self.assertTrue(self.store.submit(token, browser, self.store.csrf(token, browser), 'out', 'yes', estimator))
+        other = self.store.issue(self.snapshot)
+        self.assertFalse(self.store.submit(other, browser, self.store.csrf(other, browser), 'out', 'yes', estimator))
+        self.assertEqual(calls, [1])
+
+    def test_submission_weather_failure_still_saves_the_observation(self):
+        token, browser = self.store.issue(self.snapshot), 'e' * 32
+        def unavailable(_):
+            raise OSError('weather offline')
+        self.assertTrue(self.store.submit(token, browser, self.store.csrf(token, browser), 'out', 'yes', unavailable))
+        report = list(self.store.export())[0]
+        self.assertEqual(report['snapshot']['status'], 'mountain_out')
+        self.assertEqual(report['snapshot']['submission_weather_estimate']['status'], 'unknown')
+        self.assertEqual(report['comparisons'], {'v1': 'uncompared', 'v2': 'uncompared'})
+
     def test_origin_validation_and_qr_encoding(self):
         self.assertEqual(public_origin('https://mountain.example/'), 'https://mountain.example')
         for url in ['http://public.example', 'https://user:password@example.com', 'https://example.com/path', 'javascript:alert(1)']:
@@ -154,6 +198,23 @@ class FeedbackHTTPTests(unittest.TestCase):
             self.get('/f/' + 'x' * 24)
         self.assertEqual(error.exception.code, 410)
         self.assertEqual(list(self.store.export()), [])
+
+    def test_receipt_and_review_use_submission_weather_not_the_old_qr(self):
+        shown = json.load(self.get('/api/visibility?feedback=true'))
+        token = shown['feedback_qr_path'].split('/')[-1]
+        html = self.get('/f/' + token).read().decode()
+        csrf = re.search(r'name="csrf" value="([^"]+)"', html).group(1)
+        self.service.fetcher = lambda *_: weather(cloud=100, visibility=120000)
+        self.service.cache.clear()
+        body = urlencode(dict(token=token, csrf=csrf, answer='not_out', present='yes', status='mountain_out')).encode()
+        receipt = self.client.open(Request(self.root + '/feedback', data=body)).read()
+        self.assertIn(b'agrees with', receipt)
+        self.assertIn(b'at submission', receipt)
+        report = list(self.store.export())[0]
+        self.assertEqual(report['snapshot']['status'], 'mountain_out')
+        self.assertEqual(report['snapshot']['submission_weather_estimate']['status'], 'not_out')
+        self.assertEqual(report['comparisons']['v1'], 'same')
+        self.assertEqual(list(self.store.review()), [])
 
     def test_unconfigured_feedback_does_not_break_weather(self):
         server = ThreadingHTTPServer(('127.0.0.1', 0), handler(self.service))

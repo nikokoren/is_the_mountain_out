@@ -124,7 +124,12 @@ def handler(service, feedback_store=None, public_url=None):
                 get = lambda key: fields.get(key, [''])[0]
                 browser = cookies['mountain_browser'].value if 'mountain_browser' in cookies else ''
                 snapshot = feedback_store.context(get('token'))
-                accepted = feedback_store.submit(get('token'), browser, get('csrf'), get('answer'), get('present'))
+                def estimate_at_submission(context):
+                    location = location_from({'mountain': [context['mountain']], 'viewpoint': [context['viewpoint']]})
+                    return service.result(location)
+                accepted, snapshot = feedback_store.submit_report(
+                    get('token'), browser, get('csrf'), get('answer'), get('present'),
+                    estimator=estimate_at_submission)
                 recent = feedback_store.recent(snapshot['mountain'], snapshot['viewpoint'])
             except (ValueError, CookieError, UnicodeError) as error:
                 self.send_html(400, page('Report not saved', f'<h1>Report not saved</h1><p>{escape(str(error))}</p>'))

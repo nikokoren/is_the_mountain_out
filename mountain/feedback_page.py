@@ -28,7 +28,8 @@ def form(snapshot, token, csrf):
     <label><input type="checkbox" name="present" value="yes" required>I’m at or near this viewpoint and looking now.</label>
     <button type="submit">Send observation</button></form>
     <small>No name, photo or precise location is requested. We store your answer, receipt time,
-    selected viewpoint and the weather estimate behind this code for up to 90 days.
+    selected viewpoint, the estimate behind this code and weather estimates evaluated
+    when you submit for up to 90 days.
     A random first-party cookie limits repeat submissions. Reports are unverified and
     do not change the display verdict.</small>''')
 
@@ -38,14 +39,16 @@ def receipt(snapshot, answer, accepted, recent):
     content = f'<h1>{heading}</h1>'
     if accepted:
         content += f'<p>You reported: <strong>{escape(CHOICES[answer])}</strong>.</p>'
-        relation = comparison(snapshot['status'], answer)
+        current = snapshot.get('submission_weather_estimate', snapshot)
+        relation = comparison(current['status'], answer)
         if relation == 'different':
             content += '<p>Your observation differs from the weather estimate. It is now in our review queue.</p>'
         elif relation == 'same':
             content += '<p>Your observation agrees with the weather estimate.</p>'
         else:
             content += '<p>This report was saved without an agreement/disagreement score.</p>'
-        content += f'<p>The estimate behind this code was <strong>{escape(snapshot["verdict"])}</strong>.</p>'
+        when = 'at submission' if 'submission_weather_estimate' in snapshot else 'behind this code'
+        content += f'<p>The weather estimate {when} was <strong>{escape(current["verdict"])}</strong>.</p>'
     content += f'<h2>Recent reports — {escape(snapshot["location"]["name"])}</h2><p>Past 20 minutes, including your saved report:</p><ul>'
     for value, label in CHOICES.items():
         content += f'<li>{escape(label)}: {recent.get(value, 0)}</li>'

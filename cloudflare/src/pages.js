@@ -21,14 +21,14 @@ export function form(snapshot,token,csrf){
   <form method="post" action="/feedback"><input type="hidden" name="token" value="${escape(token)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
   <fieldset><legend>What can you see?</legend>${opts}</fieldset>
   <label><input type="checkbox" name="present" value="yes" required>I’m at or near this viewpoint and looking now.</label><button type="submit">Send observation</button></form>
-  <small>No name, photo, GPS or IP address is stored by this application. A random first-party cookie lets your latest report replace your previous vote. Reports count for 20 minutes; history is normally retained for 90 days. Community reports are unverified and may disagree. The weather estimate is retained separately.</small>`);
+  <small>No name, photo, GPS or IP address is stored by this application. A random first-party cookie lets your latest report replace your previous vote. Reports count for 20 minutes; history is normally retained for 90 days. Community reports are unverified and may disagree. We retain the estimate behind this code and weather estimates evaluated when you submit.</small>`);
 }
 export function receipt(snapshot,answer,counts){
-  const weather=snapshot.weather_estimate??snapshot;
+  const original=snapshot.weather_estimate??snapshot,weather=original.submission_weather_estimate??original;
   const relation=comparison(weather.status,answer);
   const text=relation==='different'?'Your report differs from the weather estimate and is available for review.':relation==='same'?'Your report agrees with the weather estimate.':'Your report was saved without an agreement/disagreement score.';
   return page('Thank you',`<h1>Your observation was saved. Thank you.</h1><p>You reported: <strong>${escape(choices[answer])}</strong>.</p><p>${text}</p>
-  <p>The weather estimate behind the code was <strong>${escape(weather.verdict)}</strong>.</p>
+  <p>The weather estimate ${original.submission_weather_estimate?'at submission':'behind the code'} was <strong>${escape(weather.verdict)}</strong>.</p>
   <h2>Current reports — ${escape(snapshot.location.name)}</h2><p>Latest report per browser, past 20 minutes:</p><ul>${Object.entries(choices).map(([v,label])=>`<li>${escape(label)}: ${counts[v]??0}</li>`).join('')}</ul>
   <p>Your report counts for 20 minutes from submission. Updating your report replaces your earlier vote. Other people’s reports do not extend it. Can’t tell does not vote for a condition; conflicting answers produce UNKNOWN until resolved or expired.</p>
   <p>The device will pick up current conditions on its next refresh, usually within 15 minutes. An expired report may remain on a screen until the following refresh.</p>`);

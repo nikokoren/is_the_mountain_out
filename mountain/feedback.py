@@ -6,6 +6,7 @@ import json
 import secrets
 import sqlite3
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import contextmanager
 from urllib.parse import urlsplit
@@ -79,7 +80,12 @@ class FeedbackStore:
     def csrf(self, token, browser):
         return self.digest('csrf:' + token + ':' + browser)
 
-    def submit(self, token, browser, csrf, answer, present):
+    def submit(self, token, browser, csrf, answer, present, estimator=None):
+        accepted, _ = self.submit_report(token, browser, csrf, answer, present, estimator)
+        return accepted
+
+    def submit_report(self, token, browser, csrf, answer, present, estimator=None):
+        """Return the saved evidence for a receipt without changing the legacy bool API."""
         snapshot = self.context(token)
         if (not browser or len(browser) != 32 or len(csrf) != 64 or
                 any(c not in '0123456789abcdef' for c in csrf) or
@@ -88,14 +94,27 @@ class FeedbackStore:
         if answer not in CHOICES or present != 'yes':
             raise ValueError('Choose an answer and confirm you are looking from this viewpoint now.')
         now = self.clock()
+        browser_hash, bucket = self.digest('browser:' + browser), int(now // 600)
+        with self.connect() as db:
+            if db.execute('SELECT 1 FROM reports WHERE viewpoint=? AND browser_hash=? AND bucket=?',
+                          (snapshot['viewpoint'], browser_hash, bucket)).fetchone():
+                return False, snapshot
+        if estimator is not None:
+            try:
+                submission = estimator(snapshot)
+            except (OSError, ValueError, TimeoutError):
+                from mountain.model import unknown
+                submission = unknown('Weather estimate unavailable at submission.',
+                                     datetime.fromtimestamp(now, timezone.utc), snapshot['location'])
+            snapshot = {**snapshot, 'submission_weather_estimate': submission}
         with self.connect() as db:
             try:
                 db.execute('INSERT INTO reports(received,mountain,viewpoint,answer,browser_hash,bucket,snapshot) VALUES (?,?,?,?,?,?,?)',
                            (now, snapshot['mountain'], snapshot['viewpoint'], answer,
-                            self.digest('browser:' + browser), int(now // 600), json.dumps(snapshot)))
+                            browser_hash, bucket, json.dumps(snapshot)))
             except sqlite3.IntegrityError:
-                return False
-        return True
+                return False, snapshot
+        return True, snapshot
 
     def export(self):
         with self.connect() as db:
@@ -104,6 +123,7 @@ class FeedbackStore:
             report = dict(row)
             report['snapshot'] = json.loads(report['snapshot'])
             report['verified'] = False
+            report['comparison_basis'], report['comparisons'] = report_comparisons(report['snapshot'], report['answer'])
             yield report
 
     def recent(self, mountain, viewpoint):
@@ -116,7 +136,7 @@ class FeedbackStore:
     def review(self):
         """Private operator queue of recent disagreements; never alters the model."""
         for report in self.export():
-            if self.clock() - report['received'] <= 86400 and comparison(report['snapshot']['status'], report['answer']) == 'different':
+            if self.clock() - report['received'] <= 86400 and 'different' in report['comparisons'].values():
                 yield report
 
     def prune(self):
@@ -143,6 +163,15 @@ def comparison(status, answer):
     if status not in expected or answer == 'unsure':
         return 'uncompared'
     return 'same' if expected[status] == answer else 'different'
+
+
+def report_comparisons(snapshot, answer):
+    current = snapshot.get('submission_weather_estimate')
+    basis = 'submission' if current is not None else 'display_legacy'
+    weather = current if current is not None else snapshot
+    models = weather.get('model_comparison', {})
+    return basis, dict(v1=comparison(models.get('v1', weather).get('status'), answer),
+                       v2=comparison(models.get('v2', {}).get('status'), answer))
 
 
 def main():

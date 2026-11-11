@@ -7,6 +7,11 @@ or evidence of a deployed change. The production weather model is implemented in
 tests. The anonymous report overrides are implemented by the Worker, not by the
 Python development collector.
 
+Implementation follow-up: [model v2 now runs in shadow mode](model-v2.md), and
+new reports retain submission-time forecasts for both versions alongside their
+original QR-linked weather estimate. The active displayed forecast remains v1
+until observation-based comparison supports an explicit promotion.
+
 ## How the verdict is inferred
 
 1. Select a fixed mountain/viewpoint. Seattle, Tacoma and Portland use four
@@ -83,8 +88,9 @@ model matched 4,800 local cases and 1,875 four-sample corridor cases, including
 missing samples. Python/JavaScript parity and report-snapshot tests cover the new
 fields.
 
-Next: retain a current weather estimate evaluated at report submission alongside
-the immutable estimate behind the scanned QR. A QR may be two hours old, while
+Implemented in the v2 follow-up: retain a current weather estimate evaluated at
+report submission alongside the immutable estimate behind the scanned QR.
+A QR may be two hours old, while
 the form asks for conditions now. Comparing a present observation to an old
 display estimate without accounting for that age can mislabel a genuine change
 in weather as a prediction failure. Do not overwrite the original snapshot.

@@ -10,9 +10,17 @@ for Rainier, or Mount Hood from Portland.
 This is Phase 1: an **uncalibrated estimate for the configured observation area**.
 Seattle uses four weather samples along the approximately 98 km viewing corridor,
 including near Rainier, with a distance-dependent haze penalty. This is an
-uncalibrated Seattle estimate, not a confirmed view. Terrain, cloud heights,
-darkness and webcam verification are not modelled. Paradise retains the local model.
+uncalibrated Seattle estimate, not a confirmed view. The displayed v1 model does
+not account for terrain, cloud heights, darkness or webcam verification.
+Paradise retains the local model.
 The preset selects both weather geometry and viewpoint-specific generated artwork.
+
+A [v2 candidate](docs/model-v2.md) now runs alongside v1 from the same fetched data.
+It evaluates low/mid clouds separately from high cloud, retains the haze index as
+a diagnostic, and makes nighttime or missing daylight data UNKNOWN. V1 remains
+the displayed weather model during comparison; community reports still follow
+the existing 20-minute policy. New reports retain estimates evaluated at submission
+as well as the original QR-linked weather estimate.
 
 ## Shared service
 
@@ -106,7 +114,7 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 48 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 64 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
@@ -223,12 +231,12 @@ A random first-party cookie, its database HMAC, and ten-minute windows limit
 repeat reports from the same browser/viewpoint. This is not identity verification;
 clearing cookies bypasses that limit. No invite-only trust tier is implemented.
 
-After submitting, contributors see agreement/disagreement with the estimate behind
-the code and counts of reports at that viewpoint from the past 20 minutes. They
+After submitting, contributors see agreement/disagreement with the weather estimate
+evaluated at submission and counts of reports at that viewpoint from the past 20 minutes. They
 see these **after** answering to avoid suggesting an answer. Contradictory reports
 are shown separately; no majority is described as verified truth. The immutable
 prediction snapshot, including model and forecast times, stays attached to the
-report. Client-submitted prediction fields are ignored. Reports never silently
+report alongside submission-time estimates for both models. Client-submitted prediction fields are ignored. Reports never silently
 alter the weather model or on-device verdict.
 
 Private operator tools (JSON Lines, no public export endpoint):
@@ -239,13 +247,16 @@ Private operator tools (JSON Lines, no public export endpoint):
 .venv/bin/python -m mountain.feedback prune --data-dir /YOUR/PERSISTENT/PRIVATE/DIRECTORY
 ```
 
-`review` lists disagreements received in the past 24 hours; it is an inspection
+`review` lists disagreements with either submission-time model received in the past
+24 hours, with a legacy-display comparison for older records; it is an inspection
 queue, not an automatic verdict of model failure. The running server cleans up
 expired QR contexts and reports older than 90 days at startup and hourly. If the
 service is stopped, run `prune` before exporting/reusing old storage. Keep backups
 on the same retention schedule. SQLite is suitable for a small single-instance
 pilot; multiple hosts need shared storage or a separate collection service.
 Apply gateway rate limits to polling and submission routes before public deployment.
+For matched v1/v2 counts by model version, viewpoint and date range, use the
+[private evaluation tool](docs/model-v2.md#evaluate-collected-observations).
 
 For the initial small trusted group, review disagreements daily and act on clear
 failure modes. Compare observation receipt time with the display’s check and

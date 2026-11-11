@@ -136,14 +136,24 @@ anonymous browser identifiers:
 ```sql
 SELECT id, datetime(received, 'unixepoch') AS received_utc,
        mountain, viewpoint, answer,
-       json_extract(snapshot, '$.status') AS predicted_status,
-       json_extract(snapshot, '$.forecast_at') AS forecast_at
+       json_extract(snapshot, '$.status') AS qr_weather_status,
+       json_extract(snapshot, '$.submission_weather_estimate.model_comparison.v1.status') AS submission_v1,
+       json_extract(snapshot, '$.submission_weather_estimate.model_comparison.v2.status') AS submission_v2,
+       json_extract(snapshot, '$.submission_weather_estimate.forecast_at') AS submission_forecast_at
 FROM reports ORDER BY received DESC LIMIT 100;
 ```
 
 Review disagreement cases early in the pilot. Compare timestamps and viewpoint
 before attributing a difference to a model error. Keep uncertainty and conflicting
 answers visible; don't claim calibrated probabilities from a small group.
+
+The active displayed weather forecast remains v1; v2 is an experimental shadow
+candidate. Reports retain both versions evaluated at submission, using the normal
+15-minute cache, while preserving their original QR-linked weather estimate.
+Old reports have null submission fields and cannot gain that evidence retroactively.
+The receipt compares the submitted observation with the submission-time active
+weather estimate. The [v2 guide](model-v2.md) documents the candidate rules and
+private JSON export/comparison commands. Login policy is unchanged.
 
 Normal polling/submission requests trigger background cleanup at most once per hour,
 using an atomic D1 claim shared across Worker instances. Cleanup deletes expired
