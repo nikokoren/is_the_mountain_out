@@ -92,55 +92,68 @@ Evaluate on later held-out dates/viewpoints and keep disagreement cases, uncerta
 answers and report age distinct. Login identifies an account, not a verified
 observation or calibration label.
 
-## TRMNL Companion login: what is verified
+## TRMNL Tug login: confirmed OIDC authorization pattern
+
+The author identified the example as [TRMNL Tug](https://trmnl-tug-markh.azurewebsites.net)
+and supplied the sign-in button's destination. Its public protocol parameters
+establish a more specific and suitable flow than the older Companion app API:
+
+| Parameter | Observed value or purpose |
+| --- | --- |
+| Authorization endpoint | `https://trmnl.com/oidc/authorize` |
+| `response_type` | `code` |
+| `scope` | `openid` |
+| `redirect_uri` | Tug's own `/auth/callback` |
+| `state` | Binds the authorization response to a login attempt |
+| `nonce` | Binds the ID token to that attempt |
+| `code_challenge_method` | `S256`, with a PKCE challenge |
+
+This is OpenID Connect authorization code with PKCE. Tug's client ID, callback
+and temporary login values must not be reused by our app. The flow is a protocol
+we can implement independently; no Tug implementation code has been obtained
+or copied, and the supplied login attempt was not opened or replayed.
+
+OIDC supplies an authenticated `sub` claim in a validated ID token. Together with
+the verified issuer, this is the proposed account identity for reports. It avoids
+depending on the older `/api/me` profile response, collecting email, requesting
+the broader `read` scope, or asking for an account API key.
+
+Remaining provider details must come from TRMNL's discovery metadata: exact
+issuer, token endpoint, signing algorithms, JWKS URI and permitted token-endpoint
+client authentication methods. Do not infer them from the authorization URL.
+Whether Tug's client is public or confidential is not established by that URL.
+An attempted fetch of the conventional public discovery location was denied by
+the environment proxy, so no discovery response or token signature was verified.
 
 The official [Companion app source](https://github.com/usetrmnl/trmnl-companion/tree/41cd3663ca77941e0f67563cd345113a604cad9a)
-contains an OAuth authorization-code flow:
-
-- [OAuth2Service.swift](https://github.com/usetrmnl/trmnl-companion/blob/41cd3663ca77941e0f67563cd345113a604cad9a/Companion/Services/OAuth2Service.swift)
-  redirects to `https://usetrmnl.com/oauth/authorize`, requests the `read` scope,
-  validates a random `state`, and exchanges the code at
-  `https://usetrmnl.com/api/oauth/token`.
-- [APIService.swift](https://github.com/usetrmnl/trmnl-companion/blob/41cd3663ca77941e0f67563cd345113a604cad9a/Companion/Services/APIService.swift)
-  uses the access token to fetch the account at `GET https://usetrmnl.com/api/me`.
-
-This establishes a concrete authentication pattern, not permission to reuse that
-app's registration, credentials or native-app callback.
-
-The author identified the example as [TRMNL Tug](https://trmnl-tug-markh.azurewebsites.net).
-The environment proxy rejects a connection to this host with CONNECT HTTP 403
-before reaching the application. Public GitHub searches did not locate its source.
-Its hostname was added to the existing saved network draft, preserving prior
-domains, but the running policy still has no custom host grants. The Tug sign-in
-destination, callback protocol and reuse terms remain unverified; do not assume
-that this particular app uses the official Companion app's OAuth flow. Inspection
-can resume after the network change is applied, or its sign-in destination/source
-can establish which mechanism it uses.
-
-The source app's decoded account type includes email/profile fields but does not
-establish a stable opaque account-ID field or OIDC subject. The integration needs
-a documented, stable provider account identifier. Do not substitute the access
-token, a browser cookie, a user-supplied ID or an unverified client claim for one.
+also contains a different, older OAuth flow under `usetrmnl.com/oauth/authorize`
+and `api/oauth/token`, using `read` and `/api/me`. That reference is context, not
+the integration proposed for this site now that Tug's OIDC route is known.
 
 ## Proposed mobile submission flow
 
 1. Keep weather polling and artwork public. Scanning a QR opens the observation
    page, preserving the expiring context token across sign-in.
 2. A **Sign in with TRMNL** button redirects to our Worker's login endpoint, which
-   starts an authorization-code flow using our own registered OAuth client and
-   an exact HTTPS callback on the Worker. Bind short-lived, one-use state to the
-   browser and use PKCE if the provider supports it. Validate return destinations
+   starts an OIDC authorization-code flow using our own registered client,
+   `scope=openid`, fresh state and nonce, and PKCE S256. Store the verifier and
+   short-lived one-use login state on the server, bound to the browser. Use the
+   exact registered HTTPS callback on our Worker. Validate return destinations
    and re-check the QR context after callback so expired links stay expired.
-3. Exchange the code on the server, validate the provider account through the
-   documented identity endpoint, and issue our own opaque session cookie with
+3. Exchange the code on the server using our verifier and registered client
+   authentication method. Validate the ID token using a maintained OIDC/JWT
+   library and the provider's discovery/JWKS: signature, allowed algorithm,
+   issuer, audience/authorized party, expiry, nonce and nonempty subject. Never
+   treat decoding a JWT as validating it. Issue our own opaque session cookie with
    Secure, HttpOnly and SameSite attributes. Keep provider tokens out of URLs,
    HTML, browser storage and logs. Never copy the reference app's embedded
-   credentials or token-request logging. Use minimal approved scopes and discard
-   provider tokens after identity validation if no later provider access is needed.
+   credentials or token-request logging. Request only `openid` for identity and
+   discard provider tokens after identity validation if no later provider access
+   is needed. A refresh token is not necessary for this basic local-session design.
 4. Require the server session and existing CSRF protection for POST /feedback.
-   Store an HMAC-derived identity from the verified provider identifier, with a
-   distinct source/version from old browser hashes. Compute the latest active
-   report per account and mountain/viewpoint, preventing cookie resets from
+   Store an HMAC-derived identity from a canonical pair of validated `iss` and
+   `sub` claims, with a distinct source/version from old browser hashes. Compute
+   the latest active report per account and mountain/viewpoint, preventing cookie resets from
    manufacturing independent votes for that same account. Add per-account and
    service-level rate limits and session expiry/logout handling.
    The public `feedback=true` polling path creates D1 context rows, so it also
@@ -152,24 +165,39 @@ token, a browser cookie, a user-supplied ID or an unverified client claim for on
    Update privacy/retention text for the new identity processing and decide how
    pre-login anonymous reports are handled during migration.
 
-Companion's own login session is on a different origin; our Worker cannot treat
+TRMNL's own login session is on a different origin; our Worker cannot treat
 that cookie or simply opening the app as proof of identity. The browser should
 complete a supported redirect flow back to the Worker.
 
 ## Prerequisites before implementing login
 
-- Confirm that TRMNL supports a third-party web OAuth client for this use, its
-  registration process, allowed scopes, exact endpoints and a stable identifier.
-  The current official app is evidence of the flow, not a complete public
-  registration contract.
-- Register this site's OAuth application and callback. Supply that application's
-  credentials securely through Worker/environment settings, never chat, recipe
-  templates, a downloaded ZIP or source control. Existing environment metadata
-  contains no configured OAuth credentials.
-- Permit the approved authorization/token/identity hosts where needed. The
+- Obtain TRMNL's supported registration process and OIDC discovery metadata.
+  The Tug launch URL confirms the intended protocol, but not our client
+  registration or the provider's complete implementation contract.
+- Register this site's own OIDC client and exact callback. Store its client ID
+  as configuration and any client secret, if the registered client type requires
+  one, securely as a Worker secret. Do not assume PKCE eliminates a confidential
+  client's secret, or that a public client needs one. Never share secrets in chat,
+  recipe templates, ZIPs or source control. Current environment metadata and
+  exported variable names show no OIDC client configuration.
+- Permit the approved authorization/token/discovery/JWKS hosts where needed. The
   current cloud environment allows package/GitHub hosts; it does not permit direct
   TRMNL website requests. Configure the needed domain additions without replacing
   an unknown existing allowlist. The production Worker's egress is separate.
+
+Registration brief for TRMNL:
+
+```text
+Application: Is the Mountain Out?
+Website: https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev
+Redirect URI: https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev/auth/callback
+Grant type: authorization_code
+Response type: code
+Scope: openid
+PKCE: S256
+Purpose: identify accounts submitting mountain observations; no profile/email access needed.
+Needed from provider: supported client registration/type, issuer/discovery URL and client ID.
+```
 
 Login is not implemented or enabled by this review. Anonymous submission policy
 and weather thresholds remain as before; the completed code change adds evidence
@@ -181,4 +209,4 @@ All 48 Python tests and seven Worker tests passed, including the build dry run,
 cross-language parity for input diagnostics and limiting factors, and immutable
 evidence in Python/Worker feedback snapshots. The comparison against the previous
 commit described above checks verdict preservation separately from those tests.
-No live calibration, OAuth sign-in or public deployment was performed.
+No live calibration, OIDC sign-in or public deployment was performed.
