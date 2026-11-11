@@ -42,6 +42,33 @@ class ModelTests(unittest.TestCase):
         data['hourly']['cloud_cover_high'] = [95]
         self.assertEqual(self.result(data)['status'], 'not_out')
 
+    def test_inputs_preserve_layer_evidence_and_explain_the_limiting_factor(self):
+        data = weather(cloud=10, visibility=120000)
+        data['hourly']['cloud_cover_high'] = [95]
+        result = self.result(data)
+        self.assertEqual(result['status'], 'not_out')
+        self.assertEqual(result['limiting_factors'], ['cloud_cover'])
+        self.assertEqual(result['weather_inputs'], dict(
+            cloud_cover=10, cloud_cover_low=None, cloud_cover_mid=None,
+            cloud_cover_high=95, effective_cloud_cover=95,
+            visibility=120000, precipitation=0, weather_code=0))
+
+    def test_limiting_factors_include_ties_and_leave_clear_weather_unconstrained(self):
+        cases = [
+            (dict(visibility=120000), []),
+            (dict(visibility=4999), ['visibility']),
+            (dict(visibility=120000, precipitation=1), ['precipitation']),
+            (dict(visibility=120000, code=45), ['weather_code']),
+            (dict(cloud=100, visibility=4999, precipitation=1, code=45),
+             ['cloud_cover', 'visibility', 'precipitation', 'weather_code']),
+        ]
+        for fields, factors in cases:
+            with self.subTest(fields=fields):
+                self.assertEqual(self.result(weather(**fields))['limiting_factors'], factors)
+        invalid = self.result(weather(visibility=None))
+        self.assertEqual(invalid['status'], 'unknown')
+        self.assertNotIn('weather_inputs', invalid)
+
     def test_missing_and_invalid_data(self):
         for data in [{}, {'hourly': {'time': []}}, weather(cloud=None), weather(visibility=float('nan')),
                      weather(cloud=-1), weather(code=4), weather(code=1.5), weather(cloud=True)]:

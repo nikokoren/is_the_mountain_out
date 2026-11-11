@@ -41,10 +41,10 @@ def calculate(payload, now, fetched_at, location):
                 raise ValueError(key)
             return value
 
-        cloud = number('cloud_cover', 0, 100)
+        total_cloud = number('cloud_cover', 0, 100)
         layers = [number(k, 0, 100, True) for k in
                   ('cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high')]
-        cloud = max([cloud] + [v for v in layers if v is not None])
+        cloud = max([total_cloud] + [v for v in layers if v is not None])
         visibility = number('visibility', 0, 1000000)
         rain = number('precipitation', 0, 1000)
         code = number('weather_code', 0, 99)
@@ -53,13 +53,13 @@ def calculate(payload, now, fetched_at, location):
     except (KeyError, TypeError, ValueError, IndexError, OverflowError, OSError):
         return fail('Weather data is missing or invalid.')
 
-    level = 4 if cloud <= 15 else 3 if cloud <= 35 else 2 if cloud <= 60 else 1 if cloud <= 85 else 0
-    visibility_cap = 0 if visibility < 5000 else 1 if visibility < 10000 else 2 if visibility < 20000 else 4
-    level = min(level, visibility_cap)
-    if rain >= 1 or code in {45, 48, 65, 67, 75, 82, 86, 95, 96, 99}:
-        level = 0
-    elif rain > 0 or code >= 51:
-        level = min(level, 1)
+    limits = dict(
+        cloud_cover=4 if cloud <= 15 else 3 if cloud <= 35 else 2 if cloud <= 60 else 1 if cloud <= 85 else 0,
+        visibility=0 if visibility < 5000 else 1 if visibility < 10000 else 2 if visibility < 20000 else 4,
+        precipitation=0 if rain >= 1 else 1 if rain > 0 else 4,
+        weather_code=0 if code in {45, 48, 65, 67, 75, 82, 86, 95, 96, 99} else 1 if code >= 51 else 4,
+    )
+    level = min(limits.values())
     explanations = [
         'Cloud, fog or precipitation makes a view unlikely.',
         'A partial view is plausible; cloud or haze may hide the mountain.',
@@ -69,7 +69,12 @@ def calculate(payload, now, fetched_at, location):
     ]
     result = fail(explanations[level], hour)
     result.update(status=['not_out', 'kinda_out', 'halfway_out', 'mostly_out', 'mountain_out'][level],
-                  verdict=LABELS[level].upper(), visibility_m=visibility)
+                  verdict=LABELS[level].upper(), visibility_m=visibility,
+                  limiting_factors=[key for key, cap in limits.items() if cap == level and level < 4],
+                  weather_inputs=dict(cloud_cover=total_cloud, cloud_cover_low=layers[0],
+                                      cloud_cover_mid=layers[1], cloud_cover_high=layers[2],
+                                      effective_cloud_cover=cloud, visibility=visibility,
+                                      precipitation=rain, weather_code=code))
     return result
 
 
@@ -78,7 +83,9 @@ def calculate_corridor(results, points, now, location):
     from mountain.viewpoints import distance, MOUNTAINS
     evidence = [dict(latitude=p[0], longitude=p[1], status=r['status'],
                      forecast_at=r['forecast_at'], fetched_at=r['fetched_at'],
-                     visibility_m=r.get('visibility_m')) for p, r in zip(points, results)]
+                     visibility_m=r.get('visibility_m'), weather_inputs=r.get('weather_inputs'),
+                     limiting_factors=r.get('limiting_factors', []), explanation=r['explanation'])
+                for p, r in zip(points, results)]
     if len(results) != 4 or any(r['status'] == 'unknown' or not r['forecast_at'] or
             abs((now - datetime.fromisoformat(r['forecast_at'])).total_seconds()) > MAX_HOUR_AGE or
             not r['fetched_at'] or not 0 <= (now - datetime.fromisoformat(r['fetched_at'])).total_seconds() <= MAX_RESPONSE_AGE
@@ -86,7 +93,7 @@ def calculate_corridor(results, points, now, location):
         result = unknown('A viewing-corridor forecast is unavailable or stale.', now, location)
     else:
         states = ['not_out', 'kinda_out', 'halfway_out', 'mostly_out', 'mountain_out']
-        level = min(states.index(r['status']) for r in results)
+        sample_level = min(states.index(r['status']) for r in results)
         # Trapezoidal distance/visibility index. Surface visibility has height and
         # provider ceiling limitations; this is only a tunable haze penalty.
         burden = sum(distance(points[i], points[i+1]) *
@@ -94,13 +101,17 @@ def calculate_corridor(results, points, now, location):
                       1 / max(results[i+1]['visibility_m'], 1)) / 2
                      for i in range(3))
         cap = 4 if burden <= 1 else 3 if burden <= 2 else 2 if burden <= 4 else 1 if burden <= 8 else 0
-        level = min(level, cap)
+        level = min(sample_level, cap)
         result = dict(results[0])
+        # Corridor inputs belong to their individual points, not the whole route.
+        result.pop('weather_inputs', None)
         result.update(status=states[level], verdict=LABELS[level].upper(), location=location,
                       forecast_at=min(r['forecast_at'] for r in results),
                       fetched_at=min(r['fetched_at'] for r in results),
                       explanation=f"Weather-only estimate from {location['name']} across the {MOUNTAINS[location.get('mountain', 'rainier')]['name']} corridor; not a confirmed view.",
-                      distance_m=round(distance(points[0], points[-1])), haze_index=round(burden, 3))
+                      distance_m=round(distance(points[0], points[-1])), haze_index=round(burden, 3),
+                      limiting_factors=(["corridor_weather"] if sample_level == level and level < 4 else []) +
+                                       (["distance_visibility"] if cap == level and level < 4 else []))
     result['checked_at'] = now.isoformat()
     result['corridor_samples'] = evidence
     result['model'] = location['id'] + '-corridor-v1-uncalibrated'

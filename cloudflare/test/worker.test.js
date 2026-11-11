@@ -43,6 +43,8 @@ test('Worker serves assets, initializes D1 and uses persistent weather cache for
     for(const location of Object.values(viewpoints)){
       const response=await request(`/api/visibility?mountain=${location.mountain}&viewpoint=${location.id}`),data=await response.json();
       assert.equal(data.status,'mountain_out');assert.equal(data.display_basis,'weather');assert.equal(data.mountain,location.mountain);
+      const inputs = location.id==='paradise'?data.weather_inputs:data.corridor_samples[0].weather_inputs;
+      assert.equal(inputs.cloud_cover,0);assert.equal(inputs.visibility,120000);
       const asset=await request(data.image_path);assert.equal(asset.status,200);assert.equal(asset.headers.get('Content-Type'),'image/png');
       assert.deepEqual(new Uint8Array(await asset.arrayBuffer()),new Uint8Array(readFileSync('../'+data.image_path.slice(1))));
     }
@@ -60,6 +62,10 @@ test('Feedback creates real QR, uses anonymous latest votes, expires per report,
     assert.equal(first.display.feedback_ready,true);
     const qr=await request('/q/'+first.token);assert.equal(qr.headers.get('Content-Type'),'image/svg+xml');assert.match(await qr.text(),/<svg/);
     assert.equal((await vote(request,first,'not_out', {Origin:'null','Sec-Fetch-Site':'same-origin'})).status,200);
+    const saved = await db.prepare('SELECT snapshot FROM reports WHERE context_token=?').bind(first.token).first();
+    const savedEstimate = JSON.parse(saved.snapshot);
+    assert.deepEqual(savedEstimate.corridor_samples.map(s=>s.weather_inputs),first.display.corridor_samples.map(s=>s.weather_inputs));
+    assert.deepEqual(savedEstimate.limiting_factors,first.display.limiting_factors);
     let display=await (await request('/api/visibility')).json();
     assert.equal(display.status,'not_out');assert.equal(display.display_basis,'community');assert.equal(display.weather_estimate.status,'mountain_out');
     const timestamp=display.reported_at;

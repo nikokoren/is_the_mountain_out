@@ -66,6 +66,23 @@ Provider failures have null forecast/fetched timestamps and Unavailable labels.
 Stale/invalid payloads produce UNKNOWN with a reason. API HTTP errors, network
 timeouts and malformed JSON do not become Not Out.
 
+Successful local estimates also include `weather_inputs`: the selected hour's
+total, low/mid/high cloud cover (percent), `effective_cloud_cover` (the largest
+available cover), visibility (metres), precipitation (mm/hour) and WMO weather
+code. Unavailable optional layers are null. `limiting_factors` lists the factors
+whose caps determine a reduced verdict: `cloud_cover`, `visibility`,
+`precipitation`, or `weather_code`. Ties are retained; a clear result has an empty
+list. Invalid/stale data has no invented input values or scoring diagnostics.
+
+Corridor estimates keep inputs on each `corridor_samples` item, along with its
+explanation and limiting factors. They do not label the observer's inputs as the
+inputs for the whole route. Aggregate `limiting_factors` distinguishes
+`corridor_weather` from `distance_visibility`, including ties. These additive
+diagnostics preserve the existing scoring thresholds and model identifiers.
+New immutable feedback snapshots retain this evidence after the updated backend
+is deployed, using the existing schema and retention period. Previously saved
+reports do not gain missing inputs retroactively.
+
 Any new provider should normalize its own data before calling the model or
 replace the provider/model adapter while retaining this rendering contract.
 
@@ -125,3 +142,6 @@ State illustration lives in Liquid/SVG, separately from these calculations.
 Opaque clouds obscure increasing fractions of the selected viewpoint artwork;
 UNKNOWN uses an unfilled dashed outline instead of suggesting atmospheric conditions.
 Cloud locations and shape do not encode measured cloud altitude, position or opacity.
+
+See the [November model and authentication review](visibility-review.md) for
+controlled examples, accuracy limitations and the proposed submission-login flow.

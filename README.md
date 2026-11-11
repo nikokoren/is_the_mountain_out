@@ -106,7 +106,7 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 45 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 48 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official
@@ -139,6 +139,10 @@ TRMNL refresh status before relying on a retained image. The service cannot repl
 screen while TRMNL cannot reach it. It never guarantees device refresh delivery.
 
 Future terrain and webcam work is scoped in [research notes](docs/research.md).
+The [visibility and submission-login review](docs/visibility-review.md) explains
+the current model's main accuracy limitations and the proposed TRMNL login flow.
+New estimates include weather inputs and limiting factors; after backend deployment,
+new feedback snapshots retain that evidence for calibration.
 
 Browser validation caches the official 3.4.0 CSS and fonts under `.venv/framework/`.
 To refresh that cache, clone `https://github.com/usetrmnl/trmnl-framework.git` outside

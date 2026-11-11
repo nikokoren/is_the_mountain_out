@@ -18,6 +18,10 @@ for cloud in (0,15,16,35,36,60,61,85,86,100,None,-1):
 for code in (4,45,48,51,61,65,71,75,95,99):
  payload={'hourly':{'time':[now.timestamp()],'cloud_cover':[0],'visibility':[120000],'precipitation':[0],'weather_code':[code]}}
  records.append({'payload':payload,'result':calculate(payload,now,now,VIEWPOINTS['seattle'])})
+for layer in ('cloud_cover_low','cloud_cover_mid','cloud_cover_high'):
+ for rain in (0,.1,1):
+  payload={'hourly':{'time':[now.timestamp()],'cloud_cover':[10],layer:[95],'visibility':[120000],'precipitation':[rain],'weather_code':[0]}}
+  records.append({'payload':payload,'result':calculate(payload,now,now,VIEWPOINTS['seattle'])})
 routes=[]
 for location in VIEWPOINTS.values():
  if location['id']=='paradise':continue
@@ -33,10 +37,15 @@ print(json.dumps({'now':now.timestamp(),'records':records,'routes':routes,'viewp
   for(const {payload,result} of fixture.records){
     const actual=calculate(payload,fixture.now,fixture.now,viewpoints.seattle);
     assert.equal(actual.status,result.status);assert.equal(actual.verdict,result.verdict);
+    assert.deepEqual(actual.weather_inputs,result.weather_inputs);
+    assert.deepEqual(actual.limiting_factors,result.limiting_factors);
   }
   for(const {location,results,result} of fixture.routes){
     const actual=corridor(results,samples(location),fixture.now,location);
     assert.equal(actual.status,result.status);assert.equal(actual.distance_m,result.distance_m);assert.equal(actual.haze_index,result.haze_index);
+    assert.deepEqual(actual.limiting_factors,result.limiting_factors);
+    assert.deepEqual(actual.corridor_samples.map(s=>s.weather_inputs),result.corridor_samples.map(s=>s.weather_inputs));
+    assert.deepEqual(actual.corridor_samples.map(s=>s.limiting_factors),result.corridor_samples.map(s=>s.limiting_factors));
   }
 });
 

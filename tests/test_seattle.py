@@ -50,3 +50,20 @@ class SeattleTests(unittest.TestCase):
         for remote in (weather(visibility=1000), weather(precipitation=2)):
             service = WeatherService(lambda *p: remote if p == points[-1] else weather(visibility=120000), lambda: NOW)
             self.assertEqual(service.result(SEATTLE)['status'], 'not_out')
+
+    def test_corridor_diagnostics_distinguish_distance_from_weather(self):
+        result = WeatherService(lambda *_: weather(visibility=24000), lambda: NOW).result(SEATTLE)
+        self.assertEqual(result['status'], 'kinda_out')
+        self.assertEqual(result['limiting_factors'], ['distance_visibility'])
+        self.assertNotIn('weather_inputs', result)
+        self.assertEqual(len(result['corridor_samples']), 4)
+        for point in result['corridor_samples']:
+            self.assertEqual(point['status'], 'mountain_out')
+            self.assertEqual(point['weather_inputs']['visibility'], 24000)
+            self.assertEqual(point['weather_inputs']['cloud_cover'], 0)
+            self.assertEqual(point['limiting_factors'], [])
+        points = samples(SEATTLE)
+        cloudy = WeatherService(lambda *p: weather(cloud=100 if p == points[2] else 0,
+                                                 visibility=120000), lambda: NOW).result(SEATTLE)
+        self.assertEqual(cloudy['limiting_factors'], ['corridor_weather'])
+        self.assertEqual(cloudy['corridor_samples'][2]['limiting_factors'], ['cloud_cover'])

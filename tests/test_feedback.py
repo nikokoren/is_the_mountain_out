@@ -29,6 +29,7 @@ class StoreTests(unittest.TestCase):
     def test_snapshot_immutable_and_export_private(self):
         token = self.store.issue(self.snapshot)
         self.snapshot['status'] = 'not_out'
+        self.snapshot['corridor_samples'][0]['weather_inputs']['cloud_cover'] = 100
         self.assertEqual(self.store.context(token)['status'], 'mountain_out')
         browser = 'a' * 32
         self.assertTrue(self.store.submit(token, browser, self.store.csrf(token, browser), 'partial', 'yes'))
@@ -37,6 +38,7 @@ class StoreTests(unittest.TestCase):
         self.assertFalse(report['verified'])
         self.assertNotIn('browser_hash', report)
         self.assertEqual(report['snapshot']['status'], 'mountain_out')
+        self.assertEqual(report['snapshot']['corridor_samples'][0]['weather_inputs']['cloud_cover'], 0)
         reopened = FeedbackStore(self.directory.name, lambda: self.now[0])
         self.assertEqual(reopened.csrf(token, browser), self.store.csrf(token, browser))
 

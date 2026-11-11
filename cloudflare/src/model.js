@@ -14,7 +14,7 @@ export function unknown(reason, now, location, fetched=null, forecast=null) {
 export function calculate(payload, now, fetched, location) {
   const fail = (reason,hour=null) => unknown(reason,now,location,fetched,hour);
   if (!(now-fetched>=0 && now-fetched<=3600)) return fail('Weather response is stale. Try again later.');
-  let hour, cloud, visibility, rain, code;
+  let hour, cloud, totalCloud, layers, visibility, rain, code;
   try {
     const h=payload.hourly;
     if (!Array.isArray(h.time) || !h.time.length) return fail('No hourly forecast available.');
@@ -31,21 +31,26 @@ export function calculate(payload, now, fetched, location) {
       if(typeof v!=='number'||!Number.isFinite(v)||v<low||v>high) throw Error();
       return v;
     };
-    cloud=number('cloud_cover',0,100);
-    for (const layer of ['cloud_cover_low','cloud_cover_mid','cloud_cover_high']) cloud=Math.max(cloud,number(layer,0,100,true)??0);
+    totalCloud=number('cloud_cover',0,100);
+    layers=['cloud_cover_low','cloud_cover_mid','cloud_cover_high'].map(key=>number(key,0,100,true));
+    cloud=Math.max(totalCloud,...layers.map(value=>value??0));
     visibility=number('visibility',0,1e6);rain=number('precipitation',0,1000);code=number('weather_code',0,99);
     if(!codes.has(code)) throw Error();
   } catch {return fail('Weather data is missing or invalid.');}
-  let level=cloud<=15?4:cloud<=35?3:cloud<=60?2:cloud<=85?1:0;
-  level=Math.min(level,visibility<5000?0:visibility<10000?1:visibility<20000?2:4);
-  if(rain>=1||[45,48,65,67,75,82,86,95,96,99].includes(code)) level=0;
-  else if(rain>0||code>=51) level=Math.min(level,1);
+  const limits={cloud_cover:cloud<=15?4:cloud<=35?3:cloud<=60?2:cloud<=85?1:0,
+    visibility:visibility<5000?0:visibility<10000?1:visibility<20000?2:4,
+    precipitation:rain>=1?0:rain>0?1:4,
+    weather_code:[45,48,65,67,75,82,86,95,96,99].includes(code)?0:code>=51?1:4};
+  const level=Math.min(...Object.values(limits));
   const explanations=['Cloud, fog or precipitation makes a view unlikely.',
     'A partial view is plausible; cloud or haze may hide the mountain.',
     'Mixed conditions may reveal some of the mountain.',
     'Conditions favour a view, with some cloud possible.',
     'Clear conditions favour a view of the mountain.'];
-  return {...fail(explanations[level],hour),status:states[level],verdict:labels[level],visibility_m:visibility};
+  return {...fail(explanations[level],hour),status:states[level],verdict:labels[level],visibility_m:visibility,
+    limiting_factors:Object.keys(limits).filter(key=>limits[key]===level && level<4),
+    weather_inputs:{cloud_cover:totalCloud,cloud_cover_low:layers[0],cloud_cover_mid:layers[1],cloud_cover_high:layers[2],
+      effective_cloud_cover:cloud,visibility,precipitation:rain,weather_code:code}};
 }
 
 export function distance(a,b){
@@ -57,18 +62,21 @@ export function samples(location){
   return location.id==='paradise'?[origin]:[0,1/3,2/3,1].map(f=>origin.map((v,i)=>v+(summit[i]-v)*f));
 }
 export function corridor(results,points,now,location){
-  const evidence=results.map((r,i)=>({latitude:points[i][0],longitude:points[i][1],status:r.status,forecast_at:r.forecast_at,fetched_at:r.fetched_at,visibility_m:r.visibility_m??null}));
+  const evidence=results.map((r,i)=>({latitude:points[i][0],longitude:points[i][1],status:r.status,forecast_at:r.forecast_at,fetched_at:r.fetched_at,
+    visibility_m:r.visibility_m??null,weather_inputs:r.weather_inputs??null,limiting_factors:r.limiting_factors??[],explanation:r.explanation}));
   let result;
   if(results.length!==4||results.some(r=>r.status==='unknown'||!r.forecast_at||Math.abs(now-Date.parse(r.forecast_at)/1000)>5400||!r.fetched_at||now-Date.parse(r.fetched_at)/1000<0||now-Date.parse(r.fetched_at)/1000>3600)){
     result=unknown('A viewing-corridor forecast is unavailable or stale.',now,location);
   }else{
-    let level=Math.min(...results.map(r=>states.indexOf(r.status))),burden=0;
+    const sampleLevel=Math.min(...results.map(r=>states.indexOf(r.status)));let burden=0;
     for(let i=0;i<3;i++) burden+=distance(points[i],points[i+1])*(1/Math.max(results[i].visibility_m,1)+1/Math.max(results[i+1].visibility_m,1))/2;
-    level=Math.min(level,burden<=1?4:burden<=2?3:burden<=4?2:burden<=8?1:0);
+    const cap=burden<=1?4:burden<=2?3:burden<=4?2:burden<=8?1:0,level=Math.min(sampleLevel,cap);
     result={...results[0],status:states[level],verdict:labels[level],location,
       forecast_at:results.map(r=>r.forecast_at).sort()[0],fetched_at:results.map(r=>r.fetched_at).sort()[0],
       explanation:`Weather-only estimate from ${location.name} across the ${mountains[location.mountain].name} corridor; not a confirmed view.`,
-      distance_m:Math.round(distance(points[0],points.at(-1))),haze_index:Math.round(burden*1000)/1000};
+      distance_m:Math.round(distance(points[0],points.at(-1))),haze_index:Math.round(burden*1000)/1000,
+      limiting_factors:[...(sampleLevel===level&&level<4?['corridor_weather']:[]),...(cap===level&&level<4?['distance_visibility']:[])]};
+    delete result.weather_inputs;
   }
   return {...result,checked_at:iso(now),corridor_samples:evidence,model:location.id+'-corridor-v1-uncalibrated'};
 }
