@@ -7,10 +7,10 @@ or evidence of a deployed change. The production weather model is implemented in
 tests. The anonymous report overrides are implemented by the Worker, not by the
 Python development collector.
 
-Implementation follow-up: [model v2 now runs in shadow mode](model-v2.md), and
+Implementation follow-up: [experimental model v2 is now the provisional default](model-v2.md), and
 new reports retain submission-time forecasts for both versions alongside their
-original QR-linked weather estimate. The active displayed forecast remains v1
-until observation-based comparison supports an explicit promotion.
+original QR-linked weather estimate. V1 is retained for comparison and rollback;
+the provisional switch after user-confirmed webcam mismatches is not validation.
 
 ## How the verdict is inferred
 

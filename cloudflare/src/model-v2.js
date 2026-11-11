@@ -1,4 +1,4 @@
-// Shadow candidate; keep parity with mountain/model_v2.py.
+// Experimental model; keep parity with mountain/model_v2.py.
 import {calculate,corridor,states,labels,iso} from './model.js';
 
 export function daylight(payload,now){
@@ -73,7 +73,7 @@ export function corridorV2(results,points,now,location,observability){
   return gate(result,observability??results[0]?.observability??{state:'unknown'},now);
 }
 
-export function compareModels(v1,v2){
-  const summary=Object.fromEntries(['model','status','verdict','checked_at','forecast_at','fetched_at','limiting_factors'].map(key=>[key,v1[key]??null]));
-  return {...v1,model_comparison:{active_model:'v1',v1:summary,v2,agrees:v1.status===v2.status}};
+export function compareModels(v1,v2,activeModel='v1'){
+  if(!['v1','v2'].includes(activeModel))throw Error('WEATHER_MODEL must be v1 or v2.');
+  return {...(activeModel==='v2'?v2:v1),model_comparison:{active_model:activeModel,v1,v2,agrees:v1.status===v2.status}};
 }

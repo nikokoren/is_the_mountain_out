@@ -172,6 +172,7 @@ def main():
     parser.add_argument('--port', type=int, default=8080)
     parser.add_argument('--public-url', help='Public HTTPS origin; enables feedback collection.')
     parser.add_argument('--data-dir', default='.local/mountain', help='Persistent private feedback storage directory.')
+    parser.add_argument('--weather-model', choices=('v1', 'v2'), default='v2', help='Displayed weather model (default: experimental v2).')
     args = parser.parse_args()
     public_url = public_origin(args.public_url) if args.public_url else None
     store = FeedbackStore(args.data_dir) if public_url else None
@@ -186,7 +187,7 @@ def main():
                     print('Feedback cleanup failed; inspect private storage.', flush=True)
                 self.last_prune = time.monotonic()
 
-    server = Server((args.host, args.port), handler(WeatherService(), store, public_url))
+    server = Server((args.host, args.port), handler(WeatherService(active_model=args.weather_model), store, public_url))
     print(f'Visibility service listening on {args.host}:{args.port}', flush=True)
     try:
         server.serve_forever()

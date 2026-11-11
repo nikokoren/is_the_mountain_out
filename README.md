@@ -7,20 +7,20 @@ for Rainier, or Mount Hood from Portland.
 
 ![Clear weather fixture, not live weather](docs/clear-fixture.png)
 
-This is Phase 1: an **uncalibrated estimate for the configured observation area**.
-Seattle uses four weather samples along the approximately 98 km viewing corridor,
-including near Rainier, with a distance-dependent haze penalty. This is an
-uncalibrated Seattle estimate, not a confirmed view. The displayed v1 model does
-not account for terrain, cloud heights, darkness or webcam verification.
-Paradise retains the local model.
+This is an **uncalibrated estimate for the configured observation area**.
+Seattle, Tacoma and Portland use four weather samples toward the summit;
+Paradise uses one local sample. Seattle's corridor is approximately 98 km long.
 The preset selects both weather geometry and viewpoint-specific generated artwork.
 
-A [v2 candidate](docs/model-v2.md) now runs alongside v1 from the same fetched data.
-It evaluates low/mid clouds separately from high cloud, retains the haze index as
-a diagnostic, and makes nighttime or missing daylight data UNKNOWN. V1 remains
-the displayed weather model during comparison; community reports still follow
-the existing 20-minute policy. New reports retain estimates evaluated at submission
-as well as the original QR-linked weather estimate.
+The experimental [v2 model](docs/model-v2.md) is the default weather estimate.
+It evaluates low/mid clouds separately from high cloud, keeps the distance/visibility
+haze index as a diagnostic, and makes nighttime or missing daylight data UNKNOWN.
+It retains local visibility, rain and fog limits. V1 runs alongside it for comparison
+and rollback. User-confirmed webcam sightings exposed false NOT OUT verdicts in v1;
+this provisional switch does not establish v2's accuracy. Neither model verifies
+webcams, terrain or cloud heights. Community reports still follow the existing
+20-minute policy. New reports retain both estimates evaluated at submission as
+well as the original QR-linked weather estimate.
 
 ## Shared service
 
@@ -114,7 +114,7 @@ python -m venv .venv
 ```
 
 The browser check uses `/usr/bin/chromium` and requires local process/socket access.
-The 64 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
+The 65 tests cover model boundaries, mixed conditions, missing/stale/invalid data,
 cache expiry, error recovery, observer changes, HTTP responses, Liquid escaping,
 missing data, and responsive mountain/state/QR checks across five native device profiles, both orientations and all four views. The preview harness adapts
 TRMNL's named `template` wrapper to a standard Liquid partial and uses official

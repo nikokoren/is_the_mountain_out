@@ -22,8 +22,11 @@ def fetch(latitude, longitude):
 
 
 class WeatherService:
-    def __init__(self, fetcher=fetch, clock=lambda: datetime.now(timezone.utc)):
+    def __init__(self, fetcher=fetch, clock=lambda: datetime.now(timezone.utc), *, active_model='v1'):
+        if active_model not in ('v1', 'v2'):
+            raise ValueError('WEATHER_MODEL must be v1 or v2.')
         self.fetcher, self.clock = fetcher, clock
+        self.active_model = active_model
         self.cache = OrderedDict()
         self.lock = threading.Lock()
 
@@ -69,7 +72,7 @@ class WeatherService:
             model['mountain'] = location.get('mountain', 'rainier')
             model['image_path'] = location.get('image_path', '/assets/rainier.png')
             model['viewpoint'] = location.get('id', 'paradise')
-        result = compare_models(result, candidate)
+        result = compare_models(result, candidate, self.active_model)
         # Ready-to-display strings avoid relying on TRMNL's server timezone.
         from zoneinfo import ZoneInfo
         local = ZoneInfo('America/Los_Angeles')

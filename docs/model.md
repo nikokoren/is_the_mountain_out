@@ -1,8 +1,8 @@
 # Weather model and normalized result
 
-The rules below describe the active v1 weather estimate. A separate
-[v2 candidate](model-v2.md) is evaluated in shadow mode from the same input data;
-it does not replace the displayed forecast during calibration.
+The rules below describe the retained v1 comparison model. The experimental
+[v2 model](model-v2.md) is now the default displayed weather estimate. Both use
+the same fetched data, and the maintainer can roll back with `WEATHER_MODEL=v1`.
 
 These thresholds are qualitative heuristics, **not calibrated probabilities**.
 Forecasts near the observer cannot establish what is happening along the entire

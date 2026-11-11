@@ -4,10 +4,10 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {samples,viewpoints} from '../src/model.js';
 
-async function runtime(outbound){
+async function runtime(outbound,bindings={WEATHER_MODEL:'v1'}){
   const modules=[{type:'ESModule',path:'dist/worker.js'},...readdirSync('dist').filter(s=>s.endsWith('.sql')).map(s=>({type:'Text',path:'dist/'+s}))];
   let upstream=0;
-  const mf=new Miniflare(await convertV4MiniflareOptions({modules,compatibilityDate:'2026-10-01',d1Databases:['DB'],
+  const mf=new Miniflare(await convertV4MiniflareOptions({modules,bindings,compatibilityDate:'2026-10-01',d1Databases:['DB'],
     serviceBindings:{ASSETS:async request=>new Response(readFileSync('../assets'+new URL(request.url).pathname),{headers:{'Content-Type':'image/png'}})},
     outboundService:async request=>{upstream++;if(outbound)return outbound(request);throw Error('No network in integration test');}}));
   const request=(path,options={})=>mf.dispatchFetch('https://mountain.test'+path,options);
@@ -16,7 +16,7 @@ async function runtime(outbound){
   const t=Date.now()/1000;
   for(const location of Object.values(viewpoints))for(const point of samples(location)){
     const payload={hourly:{time:[t],cloud_cover:[0],visibility:[120000],precipitation:[0],weather_code:[0]}};
-    await db.prepare('INSERT OR REPLACE INTO weather_cache(key,fetched,payload) VALUES (?,?,?)').bind(point.join(','),t,JSON.stringify(payload)).run();
+    await db.prepare('INSERT OR REPLACE INTO weather_cache(key,fetched,payload) VALUES (?,?,?)').bind('solar-v1:'+point.join(','),t,JSON.stringify(payload)).run();
   }
   return {mf,db,request,upstream:()=>upstream};
 }
@@ -40,13 +40,13 @@ function weatherCandidate(options={}){
     daily:{sunrise:[-1,0,1].map(d=>t-18000+d*86400),sunset:[-1,0,1].map(d=>t+18000+d*86400)}};
 }
 
-test('Both weather models share fetched inputs and request bracketed sunrise/sunset data',async()=>{
+test('V1 rollback shares solar inputs with v2 and refreshes pre-rollout cache entries',async()=>{
   const urls=[];
   const {mf,db,request,upstream}=await runtime(request=>{
     urls.push(new URL(request.url));return new Response(JSON.stringify(weatherCandidate()));
   });
   try{
-    await db.prepare('DELETE FROM weather_cache').run();
+    await db.prepare("UPDATE weather_cache SET key=replace(key,'solar-v1:','')").run();
     const data=await (await request('/api/visibility')).json();
     assert.equal(data.status,'kinda_out');
     assert.equal(data.model_comparison.active_model,'v1');
@@ -54,6 +54,7 @@ test('Both weather models share fetched inputs and request bracketed sunrise/sun
     assert.equal(data.model_comparison.v2.status,'mountain_out');
     assert.equal(data.model_comparison.v2.observability.state,'daylight');
     assert.equal(data.model_comparison.agrees,false);
+    assert.equal(data.model_comparison.v1.corridor_samples[0].weather_inputs.visibility,24000);
     assert.equal(upstream(),4);
     for(const url of urls){
       assert.equal(url.searchParams.get('daily'),'sunrise,sunset');
@@ -62,6 +63,40 @@ test('Both weather models share fetched inputs and request bracketed sunrise/sun
       assert.equal(url.searchParams.get('timeformat'),'unixtime');
     }
     await request('/api/visibility');assert.equal(upstream(),4);
+  }finally{await mf.dispose();}
+});
+
+test('V2 is the default weather estimate, retains v1 evidence and still yields to current reports',async()=>{
+  const {mf,db,request}=await runtime(undefined,{});
+  try{
+    assert.equal((await (await request('/health')).json()).weather_model,'v2');
+    await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(weatherCandidate({cloud:100,high:100}))).run();
+    const first=await context(request);
+    assert.equal(first.display.status,'mountain_out');
+    assert.equal(first.display.model,'seattle-corridor-v2-candidate');
+    const comparison=first.display.model_comparison;
+    assert.equal(comparison.active_model,'v2');
+    assert.equal(comparison.v1.status,'not_out');
+    assert.equal(comparison.v1.corridor_samples[0].weather_inputs.effective_cloud_cover,100);
+    assert.equal(comparison.v2.corridor_samples[0].weather_inputs.effective_cloud_cover,0);
+    const response=await vote(request,first,'not_out');
+    assert.match(await response.text(),/differs from/);
+    const saved=JSON.parse((await db.prepare('SELECT snapshot FROM reports WHERE context_token=?').bind(first.token).first()).snapshot);
+    assert.equal(saved.submission_weather_estimate.model_comparison.active_model,'v2');
+    assert.equal(saved.submission_weather_estimate.status,'mountain_out');
+    let data=await (await request('/api/visibility')).json();
+    assert.equal(data.status,'not_out');assert.equal(data.display_basis,'community');
+    assert.equal(data.weather_estimate.status,'mountain_out');
+    assert.equal(data.weather_estimate.model_comparison.v1.status,'not_out');
+    await db.prepare('UPDATE reports SET received=?').bind(Date.now()/1000-1201).run();
+    data=await (await request('/api/visibility')).json();
+    assert.equal(data.display_basis,'weather');assert.equal(data.status,'mountain_out');
+    const night=weatherCandidate();
+    for(const field of ['sunrise','sunset'])night.daily[field]=night.daily[field].map(t=>t-36000);
+    await db.prepare('UPDATE weather_cache SET payload=?').bind(JSON.stringify(night)).run();
+    data=await (await request('/api/visibility')).json();
+    assert.equal(data.status,'unknown');assert.deepEqual(data.limiting_factors,['darkness']);
+    assert.equal(data.weather_conditions.status,'mountain_out');
   }finally{await mf.dispose();}
 });
 

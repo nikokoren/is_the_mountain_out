@@ -140,3 +140,26 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(params['past_days'], ['1'])
         self.assertEqual(params['timezone'], ['UTC'])
         self.assertEqual(params['timeformat'], ['unixtime'])
+
+    def test_v2_selection_preserves_both_models_and_local_visibility_limits(self):
+        calls = []
+        def fetcher(*coords):
+            calls.append(coords)
+            return candidate_weather(cloud=100, high=100)
+        service = WeatherService(fetcher, lambda: NOW, active_model='v2')
+        result = service.result(SEATTLE)
+        self.assertEqual(result['status'], 'mountain_out')
+        comparison = result['model_comparison']
+        self.assertEqual(comparison['active_model'], 'v2')
+        self.assertEqual(comparison['v1']['status'], 'not_out')
+        self.assertEqual(comparison['v1']['corridor_samples'][0]['weather_inputs']['effective_cloud_cover'], 100)
+        self.assertEqual(comparison['v2']['corridor_samples'][0]['weather_inputs']['effective_cloud_cover'], 0)
+        service.active_model = 'v1'
+        self.assertEqual(service.result(SEATTLE)['status'], 'not_out')
+        self.assertEqual(len(calls), 4)
+        capped = WeatherService(lambda *_: candidate_weather(visibility=19600), lambda: NOW,
+                                active_model='v2').result(SEATTLE)
+        self.assertEqual(capped['status'], 'halfway_out')
+        with self.assertRaises(ValueError):
+            WeatherService(active_model='invalid')
+        json.dumps(result, allow_nan=False)

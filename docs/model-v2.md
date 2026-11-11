@@ -1,8 +1,20 @@
-# Model v2: shadow comparison and submission-time evidence
+# Model v2: provisional default and submission-time evidence
 
-V2 is an experimental, uncalibrated candidate. The API continues to use v1 for
-the displayed weather estimate. Community-report overrides retain their existing
-20-minute policy. No automatic promotion or threshold fitting is implemented.
+V2 is the experimental, uncalibrated default weather estimate. User-confirmed
+webcam sightings exposed false NOT OUT predictions in v1, supporting a reversible
+trial of v2 while testing continues. Those sightings do not establish v2's accuracy:
+the old deployed responses lack the cloud-layer and precipitation inputs needed
+to reconstruct its prediction. No thresholds were fitted to make those examples
+say OUT. V1 remains available in every response and as a rollback setting.
+Community-report overrides retain their existing 20-minute policy.
+
+The Worker reads `WEATHER_MODEL`, configured as `v2` in `wrangler.jsonc`. Set it
+to `v1` and redeploy to roll back without changing the algorithms, weather cache
+or stored reports. An authenticated maintainer can also use
+`npx wrangler deploy --var WEATHER_MODEL:v1`; the next ordinary deployment uses
+the repository's configured value again. The Python server defaults to v2 and
+accepts `--weather-model v1`; the `WeatherService` library retains its v1 default
+for existing callers and accepts `active_model='v2'` explicitly.
 
 The Python implementation is `mountain/model_v2.py`; the Worker implementation
 is `cloudflare/src/model-v2.js`. Cross-language tests compare full normalized
@@ -59,18 +71,25 @@ sunset occurring while the route's samples load cannot leave a daylight verdict.
 This is a conservative solar-day check, not a camera observation or a claim that
 the mountain cannot be seen before sunrise or under moonlight.
 
-Existing cache rows without daily data keep v1 working normally and make v2
-UNKNOWN until refreshed by the normal 15-minute cache policy. There is no cache
-or schema migration.
+The Worker now prefixes cache keys with `solar-v1:` so pre-rollout responses
+without daily data are refreshed on the first request. Both models share those
+new entries with the usual 15-minute policy. Old entries expire through normal
+cleanup. Reports, QR contexts and the database schema are preserved.
+
+The existing local visibility cap remains a known limitation: with the user's
+reported Seattle visibility of 19,600 m, even clear, dry v2 weather is capped at
+HALFWAY OUT. Switching models alone does not resolve that mismatch. Review the
+new raw inputs against timestamped webcams before changing that rule.
 
 ## API fields
 
-The original top-level weather fields and v1 model identifier remain. Added:
+The top-level weather fields describe the selected model. Both complete model
+results, including timestamps, inputs and location metadata, are retained:
 
 ```json
 {
   "model_comparison": {
-    "active_model": "v1",
+    "active_model": "v2",
     "v1": {
       "model": "seattle-corridor-v1-uncalibrated",
       "status": "kinda_out"
@@ -86,8 +105,8 @@ The original top-level weather fields and v1 model identifier remain. Added:
 }
 ```
 
-This abbreviated example is a fixture, not live weather. V1 is a summary; v2 is
-the full candidate with timestamps, weather evidence and location metadata.
+This abbreviated example is a fixture, not live weather. Both versions retain
+their full weather evidence; neither model contains another comparison object.
 `agrees` compares status strings, not accuracy. The active-model field refers to
 the weather model; `display_basis` still identifies a community override.
 
@@ -154,14 +173,14 @@ Empty or all-skipped input is not validation of either model.
 Use earlier observations for hypothesis development and a later, held-out date
 range for comparison. Review actual disagreement cases, age differences, daylight
 coverage and input completeness at each viewpoint. Keep conflicting observations
-and avoid pooling repeatedly correlated reports as independent truth. Promotion
-to the displayed model is a separate explicit change after evaluation.
+and avoid pooling repeatedly correlated reports as independent truth. The
+provisional v2 default is an operational choice, not a claim of validation.
 
 ## Current checks
 
-The implementation is covered by 64 Python tests and 11 Worker/Node tests,
+The implementation is covered by 65 Python tests and 12 Worker/Node tests,
 including the Worker build dry run, full Python/JavaScript candidate parity,
-provider-query/caching checks, solar boundaries, stale and missing samples,
+provider-query/caching checks, default selection and rollback, solar boundaries, stale and missing samples,
 submission snapshots, replay immutability and evaluation-tool accounting.
 The mobile feedback flow is also exercised with Chromium and fixture weather.
 These checks establish implementation behavior, not measured improvement in

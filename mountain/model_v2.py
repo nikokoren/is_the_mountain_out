@@ -1,4 +1,4 @@
-"""Shadow candidate: layer-aware weather, no distance cap, explicit daylight."""
+"""Experimental model: layer-aware weather, no distance cap, explicit daylight."""
 from datetime import datetime
 from math import isfinite
 from mountain.model import calculate, calculate_corridor, LABELS, UTC
@@ -111,9 +111,10 @@ def corridor_v2(results, points, now, location, observability=None):
                  results[0]['observability'] if results else dict(state='unknown'), now)
 
 
-def compare_models(v1, v2):
-    """Keep the original public verdict and attach a separately identified candidate."""
-    summary = {key: v1.get(key) for key in
-               ('model', 'status', 'verdict', 'checked_at', 'forecast_at', 'fetched_at', 'limiting_factors')}
-    return {**v1, 'model_comparison': dict(active_model='v1', v1=summary, v2=v2,
-                                         agrees=v1['status'] == v2['status'])}
+def compare_models(v1, v2, active_model='v1'):
+    """Select the displayed estimate while retaining both models' full evidence."""
+    if active_model not in ('v1', 'v2'):
+        raise ValueError('WEATHER_MODEL must be v1 or v2.')
+    return {**(v2 if active_model == 'v2' else v1),
+            'model_comparison': dict(active_model=active_model, v1=v1, v2=v2,
+                                     agrees=v1['status'] == v2['status'])}

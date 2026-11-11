@@ -33,7 +33,9 @@ function output(data,status=200,type='application/json; charset=utf-8',extra={})
 const html=(title,content,status=200,extra={})=>output(page(title,content),status,'text/html; charset=utf-8',extra);
 
 async function weatherSample(env,location,point){
-  const key=point.join(','),cached=await env.DB.prepare('SELECT fetched,payload FROM weather_cache WHERE key=?').bind(key).first();
+  // Older cache entries have no solar data. Refresh once after this rollout,
+  // then share the same inputs across either active-model setting.
+  const key='solar-v1:'+point.join(','),cached=await env.DB.prepare('SELECT fetched,payload FROM weather_cache WHERE key=?').bind(key).first();
   const time=now();let payload, fetched;
   if(cached && time-cached.fetched>=0 && time-cached.fetched<(cached.payload?900:60)){
     payload=cached.payload?JSON.parse(cached.payload):null;fetched=cached.fetched;
@@ -57,7 +59,7 @@ async function estimate(env,location){
   const result=points.length===1?{...pairs[0].v1,model:'local-weather-v1-uncalibrated'}:corridor(pairs.map(p=>p.v1),points,evaluatedAt,location);
   const candidate=points.length===1?pairs[0].v2:corridorV2(pairs.map(p=>p.v2),points,evaluatedAt,location,daylight(pairs[0].payload,evaluatedAt));
   for(const model of [result,candidate])Object.assign(model,{mountain:location.mountain,viewpoint:location.id,image_path:location.image_path});
-  return compareModels(result,candidate);
+  return compareModels(result,candidate,env.WEATHER_MODEL??'v2');
 }
 
 export async function activeReports(db,mountain,viewpoint,time=now()){
@@ -119,7 +121,7 @@ async function route(request,env){
   }
   if(request.method==='GET' && path==='/')return output(home(),200,'text/html; charset=utf-8');
   if(request.method==='GET' && path==='/health'){
-    await init(env);await env.DB.prepare('SELECT 1').first();return output({status:'ok',storage:'d1'});
+    await init(env);await env.DB.prepare('SELECT 1').first();return output({status:'ok',storage:'d1',weather_model:env.WEATHER_MODEL??'v2'});
   }
   if(request.method==='GET' && path==='/api/visibility'){
     let location;try{location=locationFrom(url.searchParams);}catch(error){return output({error:error.message},400);}

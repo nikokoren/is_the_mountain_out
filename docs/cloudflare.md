@@ -33,13 +33,18 @@ automatically on its first API request. Keep that database when redeploying.
 Do not create an R2 bucket or purchase a domain for this recipe.
 
 The button uses Cloudflare's documented public-repository deployment flow, including
-automatic resource provisioning. That account-authorized flow cannot be completed
-from this chat without your Cloudflare connection/authorization. It has not been
-run against your account yet.
+automatic resource provisioning. It is for a new installation; updates to the
+existing shared Worker should use its current repository connection below.
 
 ## Alternative: keep deploying the existing repository
 
-If you want commits to `nikokoren/is_the_mountain_out` to deploy automatically:
+The shared Worker already has **Cloudflare Workers Builds** connected to this
+repository; the GitHub check on `a7b56ad` identifies script `is-the-mountain-out`
+and a successful Cloudflare version. Publish tested updates to `main`, then verify
+the resulting Cloudflare check and the live API. Preserve the existing `DB`
+binding and database when updating; do not use the new-install deployment button.
+
+To configure the same connection for a separate installation:
 
 1. In **Workers & Pages**, choose **Create application** and the option to import
    an existing Git repository.
@@ -86,8 +91,14 @@ template and each layout tab. The recipe is pinned to Framework 3.4.0.
 Check the deployed site before relying on the device:
 
 - The landing page opens at your `.workers.dev` address.
-- `/health` returns `{"status":"ok","storage":"d1"}`.
+- `/health` returns `status: ok`, `storage: d1` and `weather_model: v2`.
 - `/api/visibility?mountain=rainier&viewpoint=seattle` returns a current result.
+- `model_comparison.active_model` is `v2`, with both complete model predictions.
+
+V2 is a provisional default. Set `vars.WEATHER_MODEL` to `v1` in `wrangler.jsonc`
+and redeploy for rollback. An authenticated CLI deployment can override it with
+`npx wrangler deploy --var WEATHER_MODEL:v1`; a later ordinary deployment restores
+the repository setting. Model selection does not reset reports or weather data.
   UNKNOWN means the weather data is missing/stale, not that the mountain is hidden.
 - The QR feedback page names the correct mountain and viewpoint. Submit an actual
   observation, then confirm the receipt and subsequent display refresh.
@@ -147,8 +158,8 @@ Review disagreement cases early in the pilot. Compare timestamps and viewpoint
 before attributing a difference to a model error. Keep uncertainty and conflicting
 answers visible; don't claim calibrated probabilities from a small group.
 
-The active displayed weather forecast remains v1; v2 is an experimental shadow
-candidate. Reports retain both versions evaluated at submission, using the normal
+The active displayed weather forecast defaults to experimental v2; v1 is retained
+for comparison and rollback. Reports retain both versions evaluated at submission, using the normal
 15-minute cache, while preserving their original QR-linked weather estimate.
 Old reports have null submission fields and cannot gain that evidence retroactively.
 The receipt compares the submitted observation with the submission-time active
