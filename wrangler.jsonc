@@ -6,6 +6,11 @@
   "workers_dev": true,
   "preview_urls": false,
   "vars": { "WEATHER_MODEL": "v2" },
+  "previews": {
+    "vars": { "WEATHER_MODEL": "v2" },
+    // Preview-owned storage; no production database name or ID.
+    "d1_databases": [{ "binding": "DB" }]
+  },
   "assets": {
     "directory": "assets",
     "binding": "ASSETS",

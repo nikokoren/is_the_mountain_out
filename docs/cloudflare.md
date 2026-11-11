@@ -44,6 +44,17 @@ and a successful Cloudflare version. Publish tested updates to `main`, then veri
 the resulting Cloudflare check and the live API. Preserve the existing `DB`
 binding and database when updating; do not use the new-install deployment button.
 
+Production builds must use deploy command **`npm run deploy`** (which runs
+`wrangler deploy`). **`npx wrangler preview`** publishes a separate Preview and
+does not update the public recipe origin. Non-production branch builds can use
+that preview command. The `previews` block explicitly sets `WEATHER_MODEL=v2`
+and declares a Preview-owned `DB` binding without the production database name or
+ID. Production reports and caches must not be bound into a Preview.
+
+If a build fails with “missing a `previews` block,” verify whether it is a branch
+Preview or the production build before diagnosing the live deployment. A successful
+Preview check alone does not establish that the shared Worker was updated.
+
 To configure the same connection for a separate installation:
 
 1. In **Workers & Pages**, choose **Create application** and the option to import
