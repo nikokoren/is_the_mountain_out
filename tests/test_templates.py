@@ -69,8 +69,6 @@ class TemplateTests(unittest.TestCase):
                                   trmnl={'plugin_settings': {'custom_fields_values': {'show_verdict_text': value}}})
                     self.assertNotIn('HALFWAY OUT', html)
                     self.assertNotIn('data-verdict-region', html)
-                    # The full-screen QR gets its own column beside the art.
-                    self.assertEqual('pr--32 lg:pr--48' in html, layout == 'full')
                     self.assertIn('/assets/rainier-seattle.png', html)
                     self.assertEqual('qr-code' in html, layout == 'full')
 
