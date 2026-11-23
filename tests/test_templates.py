@@ -78,7 +78,7 @@ class TemplateTests(unittest.TestCase):
                 html = render('unknown', layout, observability={'state': 'night'})
                 self.assertIn('data-night-sky', html)
                 self.assertIn('bg--black', html)
-                self.assertGreater(html.count('<circle'), 50)
+                self.assertGreater(html.count('<circle'), 10)
                 self.assertNotIn('UNKNOWN', html)
                 self.assertNotIn('stroke-dasharray', html)
                 self.assertNotIn('<image', html)
@@ -93,6 +93,12 @@ class TemplateTests(unittest.TestCase):
             self.assertGreater(ridge.count('L'), 100)
             ridges.add(ridge)
         self.assertEqual(len(ridges), 4)
+        # Fewer stars where light pollution is worse: Seattle < Portland < Tacoma < Paradise.
+        counts = [render('unknown', image_path=f'/assets/{image}.png', observability={'state': 'night'}).count('<circle')
+                  for image in ('rainier-seattle', 'hood-portland', 'rainier-tacoma', 'rainier')]
+        self.assertEqual(counts, sorted(set(counts)))
+        self.assertLess(counts[0], 25)
+        self.assertGreater(counts[-1], 150)
         # Unknown for other reasons (missing data, disagreeing reports) keeps the outline.
         for observability in (None, {'state': 'unknown'}, {'state': 'daylight'}):
             html = render('unknown', observability=observability)

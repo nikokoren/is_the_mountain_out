@@ -4,7 +4,9 @@ A TRMNL recipe for a familiar Northwest question: **is the mountain out?**
 Viewpoint-specific Rainier or Hood artwork fills the screen, with five weather-based verdicts
 and an honest **UNKNOWN** state. Between sunset and sunrise the screen shows a
 black, starry night sky instead, with the mountain a dark silhouette blocking the
-stars, because it cannot be judged in the dark. Defaults to Mount Rainier from Seattle’s Kerry Park. Choose Tacoma or Paradise
+stars, because it cannot be judged in the dark. Star counts follow each viewpoint's
+approximate light pollution: a few bright stars over Seattle, more over Portland
+and Tacoma, and a full sky at Paradise. Defaults to Mount Rainier from Seattle’s Kerry Park. Choose Tacoma or Paradise
 for Rainier, or Mount Hood from Portland.
 
 ![Clear weather fixture, not live weather](docs/clear-fixture.png)
