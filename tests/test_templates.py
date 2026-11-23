@@ -84,6 +84,15 @@ class TemplateTests(unittest.TestCase):
                 self.assertNotIn('<image', html)
                 self.assertNotIn('qr-code', render('unknown', layout, observability={'state': 'night'}, feedback_qr_path='/q/example'))
                 self.assertEqual('position:fixed' in html, layout == 'full')
+        # Each viewpoint's own ridgeline blocks the stars behind the mountain.
+        ridges = set()
+        for image in ('rainier-seattle', 'rainier', 'rainier-tacoma', 'hood-portland'):
+            html = render('unknown', image_path=f'/assets/{image}.png', observability={'state': 'night'})
+            ridge = html.split('data-night-ridge>', 1)[1].split('</svg>', 1)[0]
+            self.assertIn('fill="#000"', ridge)
+            self.assertGreater(ridge.count('L'), 100)
+            ridges.add(ridge)
+        self.assertEqual(len(ridges), 4)
         # Unknown for other reasons (missing data, disagreeing reports) keeps the outline.
         for observability in (None, {'state': 'unknown'}, {'state': 'daylight'}):
             html = render('unknown', observability=observability)
