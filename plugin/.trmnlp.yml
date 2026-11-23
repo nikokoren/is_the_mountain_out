@@ -4,6 +4,7 @@ watch:
   - src
 custom_fields:
   show_feedback_qr: false
+  show_verdict_text: true
   mountain: rainier
   rainier_viewpoint: seattle
   hood_viewpoint: portland

@@ -55,6 +55,11 @@ custom_fields:
     default: portland
     options:
       - Portland — Pittock Mansion: portland
+  - keyname: show_verdict_text
+    name: Show verdict text
+    field_type: boolean
+    default: true
+    description: Show the verdict (such as MOUNTAIN OUT or NOT OUT) in large text below the mountain. Turn off to show only the illustration.
   - keyname: show_feedback_qr
     name: Show feedback QR on full screen
     field_type: boolean

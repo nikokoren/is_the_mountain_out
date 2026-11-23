@@ -1,5 +1,21 @@
 {% template mountain %}
 {% assign image_origin = 'https://is-the-mountain-out.5g5wqr7kzx-466.workers.dev' %}
+{% assign state = status | default: 'unknown' %}
+{% comment %}Verdict text is on unless the setting is explicitly off; TRMNL may send booleans or strings.{% endcomment %}
+{% assign show_text = true %}
+{% assign text_setting = show_verdict_text | append: '' | downcase %}
+{% if text_setting == 'false' or text_setting == 'no' or text_setting == 'off' or text_setting == '0' %}{% assign show_text = false %}{% endif %}
+{% if state == 'unknown' and night == 'night' %}
+<!-- After sunset the view cannot be judged: a plain night sky replaces the scene and verdict. -->
+{% comment %}Full screen only (the one layout with feedback): the sky is fixed to the viewport so it also covers the device padding. Mashups keep their gutters.{% endcomment %}
+<div class="w--full h--full bg--black" data-night-sky{% if allow_feedback %} style="position:fixed;inset:0;width:auto;height:auto"{% endif %}>
+<svg class="w--full h--full block" viewBox="0 0 800 480" preserveAspectRatio="xMidYMid slice" aria-label="Night sky">
+  <rect width="800" height="480" fill="#000"/>
+  <g fill="#fff"><circle cx="262" cy="78" r="1.5"/><circle cx="518" cy="42" r="2.5"/><circle cx="428" cy="178" r="2"/><circle cx="53" cy="243" r="1.5"/><circle cx="63" cy="50" r="1.5"/><circle cx="341" cy="392" r="1.5"/><circle cx="105" cy="112" r="1.5"/><circle cx="500" cy="448" r="1.5"/><circle cx="773" cy="30" r="1.5"/><circle cx="681" cy="142" r="1.5"/><circle cx="250" cy="387" r="1.5"/><circle cx="150" cy="278" r="1.5"/><circle cx="509" cy="181" r="1.5"/><circle cx="437" cy="37" r="1.5"/><circle cx="254" cy="280" r="1.5"/><circle cx="363" cy="147" r="2"/><circle cx="631" cy="332" r="1.5"/><circle cx="420" cy="414" r="2"/><circle cx="580" cy="142" r="1.5"/><circle cx="39" cy="318" r="1.5"/><circle cx="607" cy="274" r="1.5"/><circle cx="553" cy="284" r="1.5"/><circle cx="667" cy="446" r="2.5"/><circle cx="380" cy="316" r="1.5"/><circle cx="310" cy="318" r="2"/><circle cx="140" cy="62" r="1.5"/><circle cx="226" cy="201" r="1.5"/><circle cx="470" cy="130" r="1.5"/><circle cx="11" cy="202" r="1.5"/><circle cx="755" cy="328" r="1.5"/><circle cx="713" cy="370" r="2"/><circle cx="316" cy="193" r="1.5"/><circle cx="8" cy="78" r="1.5"/><circle cx="88" cy="177" r="1.5"/><circle cx="28" cy="414" r="2.5"/><circle cx="373" cy="232" r="1.5"/><circle cx="658" cy="83" r="1.5"/><circle cx="139" cy="366" r="1.5"/><circle cx="287" cy="21" r="1.5"/><circle cx="30" cy="138" r="2.5"/><circle cx="211" cy="329" r="1.5"/><circle cx="758" cy="216" r="2.5"/><circle cx="743" cy="466" r="1.5"/><circle cx="181" cy="113" r="1.5"/><circle cx="667" cy="230" r="1.5"/><circle cx="520" cy="379" r="1.5"/><circle cx="323" cy="447" r="1.5"/><circle cx="111" cy="15" r="1.5"/><circle cx="111" cy="430" r="2.5"/><circle cx="353" cy="93" r="2"/><circle cx="448" cy="361" r="2.5"/><circle cx="488" cy="243" r="1.5"/><circle cx="747" cy="128" r="1.5"/><circle cx="180" cy="450" r="1.5"/><circle cx="784" cy="394" r="2.5"/><circle cx="135" cy="208" r="2.5"/><circle cx="574" cy="17" r="1.5"/><circle cx="58" cy="465" r="1.5"/><circle cx="253" cy="150" r="1.5"/><circle cx="204" cy="15" r="1.5"/><circle cx="691" cy="319" r="1.5"/><circle cx="569" cy="416" r="1.5"/><circle cx="639" cy="391" r="1.5"/><circle cx="446" cy="299" r="1.5"/><circle cx="499" cy="324" r="1.5"/><circle cx="791" cy="281" r="1.5"/><circle cx="409" cy="96" r="1.5"/><circle cx="582" cy="217" r="1.5"/><circle cx="692" cy="18" r="1.5"/><circle cx="543" cy="100" r="2"/></g>
+  <g stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M226 194V208M219 201H233M111 423V437M104 430H118M520 372V386M513 379H527M30 131V145M23 138H37M135 201V215M128 208H142"/></g>
+</svg>
+</div>
+{% else %}
 {% assign qr_url = '' %}
 {% if allow_feedback %}
   {% assign qr_url = feedback_url | default: '' %}
@@ -9,8 +25,7 @@
   {% endif %}
 {% endif %}
 <div class="flex flex--col flex--bottom w--full h--full gap--small relative">
-  <div class="w--full h--[52cqh] h--min-0 no-shrink" data-mountain-region>
-{% assign state = status | default: 'unknown' %}
+  <div class="w--full {% if show_text %}h--[52cqh]{% else %}h--full{% endif %} h--min-0 no-shrink" data-mountain-region>
 {% comment %}Frame out the source artwork's white bottom margin, keeping its visible base anchored.{% endcomment %}
 {% assign scene_height = 245 %}
 {% if image_path == '/assets/rainier.png' %}{% assign scene_height = 273 %}
@@ -40,6 +55,7 @@
   {% endif %}
 </svg>
   </div>
+  {% if show_text %}
   <div class="w--full no-shrink relative" data-verdict-region>
     {% if allow_feedback %}
     <!-- Match the QR's height even when disabled, keeping the composition stable. -->
@@ -55,6 +71,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
   {% if qr_url != '' %}
   <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
     <div class="w--full p--3">
@@ -64,4 +81,5 @@
   </div>
   {% endif %}
 </div>
+{% endif %}
 {% endtemplate %}

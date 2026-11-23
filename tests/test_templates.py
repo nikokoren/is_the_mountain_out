@@ -55,6 +55,43 @@ class TemplateTests(unittest.TestCase):
         self.assertNotIn('qr-code', render())
         self.assertIn('qr-code', render(feedback_qr_path='/q/example'))
 
+    def test_verdict_text_setting(self):
+        for layout in SIZES:
+            for value in (None, True, 'true', 'yes'):
+                with self.subTest(layout=layout, value=value):
+                    fields = {} if value is None else {'trmnl': {'plugin_settings': {'custom_fields_values': {'show_verdict_text': value}}}}
+                    html = render('halfway_out', layout, **fields)
+                    self.assertIn('HALFWAY OUT', html)
+                    self.assertIn('h--[52cqh]', html)
+            for value in (False, 'false', 'no', 'off', 0):
+                with self.subTest(layout=layout, value=value):
+                    html = render('halfway_out', layout, feedback_qr_path='/q/example',
+                                  trmnl={'plugin_settings': {'custom_fields_values': {'show_verdict_text': value}}})
+                    self.assertNotIn('HALFWAY OUT', html)
+                    self.assertNotIn('data-verdict-region', html)
+                    self.assertIn('/assets/rainier-seattle.png', html)
+                    self.assertEqual('qr-code' in html, layout == 'full')
+
+    def test_night_sky_replaces_unknown_after_dark(self):
+        for layout in SIZES:
+            with self.subTest(layout=layout):
+                html = render('unknown', layout, observability={'state': 'night'})
+                self.assertIn('data-night-sky', html)
+                self.assertIn('bg--black', html)
+                self.assertGreater(html.count('<circle'), 50)
+                self.assertNotIn('UNKNOWN', html)
+                self.assertNotIn('stroke-dasharray', html)
+                self.assertNotIn('<image', html)
+                self.assertNotIn('qr-code', render('unknown', layout, observability={'state': 'night'}, feedback_qr_path='/q/example'))
+                self.assertEqual('position:fixed' in html, layout == 'full')
+        # Unknown for other reasons (missing data, disagreeing reports) keeps the outline.
+        for observability in (None, {'state': 'unknown'}, {'state': 'daylight'}):
+            html = render('unknown', observability=observability)
+            self.assertIn('stroke-dasharray', html)
+            self.assertNotIn('data-night-sky', html)
+        # A confident community report at night still shows its verdict.
+        self.assertNotIn('data-night-sky', render('mountain_out', observability={'state': 'night'}))
+
     def test_user_text_is_escaped(self):
         html = render(verdict='<script>alert(1)</script>')
         self.assertNotIn('<script>', html)
@@ -68,7 +105,9 @@ class TemplateTests(unittest.TestCase):
     def test_settings(self):
         settings = yaml.safe_load(Path('plugin/src/settings.yml').read_text())
         fields = {f['keyname'] for f in settings['custom_fields']}
-        self.assertEqual(fields, {'author_bio', 'mountain', 'rainier_viewpoint', 'hood_viewpoint', 'show_feedback_qr'})
+        self.assertEqual(fields, {'author_bio', 'mountain', 'rainier_viewpoint', 'hood_viewpoint', 'show_verdict_text', 'show_feedback_qr'})
+        text = next(f for f in settings['custom_fields'] if f['keyname'] == 'show_verdict_text')
+        self.assertEqual((text['field_type'], text['default']), ('boolean', True))
         self.assertEqual(settings['strategy'], 'polling')
         self.assertEqual(settings['framework_version'], '3.4.0')
 

@@ -2,7 +2,8 @@
 
 A TRMNL recipe for a familiar Northwest question: **is the mountain out?**
 Viewpoint-specific Rainier or Hood artwork fills the screen, with five weather-based verdicts
-and an honest **UNKNOWN** state. Defaults to Mount Rainier from Seattle’s Kerry Park. Choose Tacoma or Paradise
+and an honest **UNKNOWN** state. Between sunset and sunrise the screen shows a
+black, starry night sky instead, because the mountain cannot be judged in the dark. Defaults to Mount Rainier from Seattle’s Kerry Park. Choose Tacoma or Paradise
 for Rainier, or Mount Hood from Portland.
 
 ![Clear weather fixture, not live weather](docs/clear-fixture.png)
@@ -76,9 +77,11 @@ checks, see the [publishing checklist](docs/publishing.md).
    **Tacoma — Ruston Way**, and **Paradise**; the Hood dropdown offers
    **Portland — Pittock Mansion**. Only the chosen mountain’s dropdown is shown.
    The default remains Rainier/Seattle.
-3. Optionally enable **Show feedback QR on full screen**. It is off by default
+3. **Show verdict text** is on by default. Turn it off to show only the
+   illustration, without the large verdict (such as MOUNTAIN OUT) below it.
+4. Optionally enable **Show feedback QR on full screen**. It is off by default
    and never appears in mashups. Reports are shared with others at that viewpoint.
-4. Preview the plugin, then add it to your device playlist. Polling is GET with a
+5. Preview the plugin, then add it to your device playlist. Polling is GET with a
    15-minute refresh, and Framework **3.4.0** is pinned. No backend setup is needed.
 
 For an existing private installation, import the new archive or replace settings
