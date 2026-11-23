@@ -100,7 +100,8 @@
   </div>
   {% endif %}
   {% if qr_url != '' %}
-  <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
+  {% comment %}With the verdict hidden, the QR moves to the top-right corner, clear of the mountain.{% endcomment %}
+  <div class="absolute {% if show_text %}bottom--0{% else %}top--0{% endif %} right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
     <div class="w--full p--3">
       {{ qr_url | qr_code: 1, 'l' | replace: 'class="qr-code"', 'class="qr-code w--full h--auto block"' }}
     </div>

@@ -71,6 +71,9 @@ class TemplateTests(unittest.TestCase):
                     self.assertNotIn('data-verdict-region', html)
                     self.assertIn('/assets/rainier-seattle.png', html)
                     self.assertEqual('qr-code' in html, layout == 'full')
+                    if layout == 'full':
+                        self.assertIn('absolute top--0 right--0', html)
+                        self.assertNotIn('absolute bottom--0 right--0', html)
 
     def test_night_sky_replaces_unknown_after_dark(self):
         for layout in SIZES:
