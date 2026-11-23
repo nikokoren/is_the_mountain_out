@@ -51,8 +51,11 @@
     {% assign qr_url = image_origin | append: feedback_page %}
   {% endif %}
 {% endif %}
+{% comment %}With the verdict hidden, the art gives up a right-hand column so the QR sits beside it, not over it.{% endcomment %}
+{% assign art_gutter = '' %}
+{% if show_text == false and qr_url != '' %}{% assign art_gutter = ' pr--32 lg:pr--48 lg:portrait:pr--24' %}{% endif %}
 <div class="flex flex--col flex--bottom w--full h--full gap--small relative">
-  <div class="w--full {% if show_text %}h--[52cqh]{% else %}h--full{% endif %} h--min-0 no-shrink" data-mountain-region>
+  <div class="w--full {% if show_text %}h--[52cqh]{% else %}h--full{% endif %} h--min-0 no-shrink{{ art_gutter }}" data-mountain-region>
 {% comment %}Frame out the source artwork's white bottom margin, keeping its visible base anchored.{% endcomment %}
 {% assign scene_height = 245 %}
 {% if image_path == '/assets/rainier.png' %}{% assign scene_height = 273 %}
@@ -86,12 +89,12 @@
   <div class="w--full no-shrink relative" data-verdict-region>
     {% if allow_feedback %}
     <!-- Match the QR's height even when disabled, keeping the composition stable. -->
-    <div class="w--32 lg:w--24">
+    <div class="w--32 lg:w--48 lg:portrait:w--24">
       <div class="aspect--1/1 w--full"></div>
       <span class="label label--small block">&nbsp;</span>
     </div>
     {% endif %}
-    <div class="w--full{% if allow_feedback %} absolute top--0 px--32 lg:px--24{% endif %}">
+    <div class="w--full{% if allow_feedback %} absolute top--0 px--32 lg:px--48 lg:portrait:px--24{% endif %}">
       <!-- Fit against the actual content width, excluding the QR gutters. -->
       <div class="flex flex--center-x flex--center-y w--full w--min-0">
         <span class="value value--large lg:value--xxlarge lg:portrait:value--xlarge no-shrink" data-fit-value="true">{{ verdict | default: 'UNKNOWN' | escape }}</span>
@@ -100,7 +103,7 @@
   </div>
   {% endif %}
   {% if qr_url != '' %}
-  <div class="absolute bottom--0 right--0 w--32 lg:w--24 bg--white" data-feedback-qr>
+  <div class="absolute bottom--0 right--0 w--32 lg:w--48 lg:portrait:w--24 bg--white" data-feedback-qr>
     <div class="w--full p--3">
       {{ qr_url | qr_code: 1, 'l' | replace: 'class="qr-code"', 'class="qr-code w--full h--auto block"' }}
     </div>

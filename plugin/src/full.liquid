@@ -1,3 +1,7 @@
 <div class="layout layout--col layout--stretch gap--small">
+  {% comment %}X portrait only: the art cannot grow taller, so the viewpoint name fills the empty top.{% endcomment %}
+  <div class="hidden lg:portrait:visible w--full">
+    <span class="title lg:title--xxlarge">{{ location.name | escape }}</span>
+  </div>
   {% render 'mountain', allow_feedback: true, feedback_url: feedback_url, feedback_qr_path: feedback_qr_path, status: status, verdict: verdict, image_path: image_path, night: observability.state, show_verdict_text: trmnl.plugin_settings.custom_fields_values.show_verdict_text %}
 </div>
